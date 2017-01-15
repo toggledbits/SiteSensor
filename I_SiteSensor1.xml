@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<implementation>
+    <functions>
+        -- -------------------------------------------------------------------------------------------------------------------------
+        -- Deus Ex Machina (II)
+        -- https://github.com/toggledbits/DeusExMachina
+        -- Original code and releases 1.x by Andy Lintner (beowulfe) Version 2.0 and beyond by Patrick Rigney (rigpapa/toggledbits).
+        -- A big thanks to Andy for passing the torch so that this great plug-in can live on.
+        -- -------------------------------------------------------------------------------------------------------------------------
+        function startupSiteSensor(dev)
+            luup.log("SiteSensor STARTUP!")
+            SiteSensor = require("L_SiteSensor1")
+            runQuery = SiteSensor.runQuery
+            SiteSensor.init(dev)
+        end
+    </functions>
+    <startup>startupSiteSensor</startup>
+    <actionList>
+        <action>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <name>GetStatus</name>
+            <run>
+                return -- what we do here doesn't matter, luup uses the relatedStateVariable directly
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <name>GetInterval</name>
+            <run>
+                return -- what we do here doesn't matter, luup uses the relatedStateVariable directly
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <name>SetInterval</name>
+            <run>
+                local newInterval = lul_settings.newTargetValue
+                if newInterval ~= nil then newInterval = tonumber(newInterval, 10) end
+                luup.variable_set("urn:toggledbits-com:serviceId:SiteSensor1", "Interval", newInterval, lul_device)
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <name>GetRequestURL</name>
+            <run>
+                return -- what we do here doesn't matter, luup uses the relatedStateVariable directly
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <name>SetRequestURL</name>
+            <run>
+                local newRequestURL = lul_settings.newTargetValue or ""
+                luup.variable_set("urn:toggledbits-com:serviceId:SiteSensor1", "RequestURL", newRequestURL, lul_device)
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:micasaverde-com:serviceId:SecuritySensor1</serviceId>
+            <name>SetArmed</name>
+            <run>
+                local armed = lul_settings.newArmedValue or "0"
+                if armed == "1" then
+                    SiteSensor.arm(lul_device)
+                else
+                    SiteSensor.disarm(lul_device)
+                end
+                return true
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:micasaverde-com:serviceId:SecuritySensor1</serviceId>
+            <name>GetArmed</name>
+            <run>
+                return -- what we do here doesn't matter, luup uses the relatedStateVariable directly
+            </run>
+        </action>
+    </actionList>
+</implementation>
