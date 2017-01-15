@@ -43,8 +43,7 @@ response).
 Expressions work pretty much as expected, with standard operator precedence, grouping (and nesting) with parentheses, 
 and a small library of helpful functions. 
 
-Expressions use dot notation to navigate the tree of values in the decoded
-JSON response. Let's consider this JSON response. We'll use it for all of the examples in this section:
+Expressions use dot notation to navigate the tree of values in the decoded JSON response. Let's consider this JSON response. We'll use it for all of the examples in this section:
 
 ```
 {  
