@@ -31,8 +31,8 @@ SiteSensor can retrieve and parse JSON from the remote server. You can then use 
 decoded data and store those in SiteSensor state variables (which are visible to Lua, PLEG, etc). Evaluation of an
 expression using the decoded data can also be used to set the SiteSensor device's //tripped// state.
 
-SiteSensor will evaluate up to 8 expressions and store the results. The results are stored in variables named 'Value1',
-'Value2', ..., 'Value8'. 
+SiteSensor will evaluate up to 8 expressions and store the results. The results are stored in variables named `Value1`,
+`Value2`, ..., `Value8`. 
 
 The special "Trip Condition" expression, if provided, will set SiteSensor's tripped state; if 
 not provided, the device's tripped state follows the success of the last query (tripped on error, not tripped if valid
