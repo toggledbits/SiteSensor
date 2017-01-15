@@ -139,4 +139,4 @@ Bug reports and enhancement requests are welcome! Please use the "Issues" link f
 
 ## License ##
 
-SiteSensor is offered under GPL (the GNU Public License).
+SiteSensor is offered under GPL (the GNU Public License). See the LICENSE file for details.
