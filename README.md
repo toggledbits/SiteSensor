@@ -34,9 +34,11 @@ expression using the decoded data can also be used to set the SiteSensor device'
 SiteSensor will evaluate up to 8 expressions and store the results. The results are stored in variables named `Value1`,
 `Value2`, ..., `Value8`. 
 
-The special "Trip Condition" expression, if provided, will set SiteSensor's tripped state; if 
-not provided, the device's tripped state follows the success of the last query (tripped on error, not tripped if valid
-response). 
+The special "Trip Condition" expression, if provided, will set SiteSensor's tripped state to the result of the expression
+evaluation. For these purposes, if the expression result is a *numeric* value, 0 evaluates to *false* and anything else is
+*true*; for *string* results, the empty string is *false* and any non-empty string is *true*; otherwise, nil or empty means
+*false* and anything else means *true*. If the Trip Condition is not provided, the device's tripped state follows the 
+success of the last query (tripped on error, not tripped if valid response). 
 
 #### Expressions ####
 
