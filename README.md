@@ -6,11 +6,17 @@ SiteSensor is a plugin for Vera home automation system controllers that periodic
 server. Based on the response, it sets its "tripped" state (acting as a SecuritySensor device), and can also store
 parsed values from JSON data. This makes it possible to use a remote RESTful API without writing a plugin.
 
-Currently, only HTTP/HTTPS GET queries are supported, but future plans include support for additional HTTP methods,
-and direct TCP socket connections.
+This has many uses. A trivial use may be to periodically make requests of a remote web site simply to determine 
+if your home internet connection is operating properly. An only slightly-less trivial use would be to probe a
+remote site to determine that *it* is operating correctly (a poor man's up/down monitor). More complex, but
+perhaps still fun, is that you can have SiteSensor query the Twitter API and trigger a scene in your home to
+flash a light when someone mentions you in a tweet that contains the hashtag *#happyhour*.
 
-SiteSensor is written and supported by Patrick Rigney, aka rigpapa on the Vera forums. For more information,
-see <http://www.toggledbits.com/>.
+Currently, only HTTP/HTTPS GET queries are supported, but future plans include support for additional HTTP methods
+(POST, PUT, etc.), and direct TCP socket connections.
+
+SiteSensor is written and supported by Patrick Rigney, aka rigpapa on the [Vera forums](http://http://forum.micasaverde.com/). 
+For more information, see <http://www.toggledbits.com/>.
 
 ## Installation ##
 
@@ -88,8 +94,12 @@ To configure SiteSensor for JSON response, set the "Response Type" field to *JSO
 #### Trip Conditions ####
 
 By default, SiteSensor's triggering mechanism follows the success of the query. That is, if the query fails, SiteSensor
-enters triggered state. When the response type is JSON data, the pattern-matching options for trigger type are disabled,
-and an additional option is presented: "When the result of an exression is true". This allows the entry of an expression
+enters triggered state. For JSON queries, the server must respond with a complete, non-error response, and the response
+must be fully parsed as JSON without error, for the query to be deemed successful. Either failure of the server to provide
+a response, or failure of the response to parse correctly, will cause the device to be triggered.
+
+When the response type is JSON data, the pattern-matching options for trigger type are disabled,
+and an additional option is presented: "When the result of an expression is true". This allows the entry of an expression
 which is evaluated against the response data, and if the expression is (logically) true, the device enters triggered state.
 The following conditions apply:
 
@@ -178,7 +188,8 @@ String functions: len(s), find(s, p [,i]), sub(s, n [,l]), upper(s), lower(s), t
 Other functions: time(), strftime( fmt [,t] ), choose( n, d, v1, v2, ...), select( obj, key, val )
 
 Array elements can be accessed using square brackets and the desired element number. The value of the third element in `response.listitems` 
-in our example would therefore be returned using the expression `response.listitems[3]`. Array subscripts can also be strings.
+in our example would therefore be returned using the expression `response.listitems[3]`. Array subscripts can also be strings, and in this 
+usage, `response.temperature.degrees` and `response['temperature']['degrees']` are synonymous (the dot-notation is a shortcut).
 
 The "alerts" array is an interesting case--it's an array of objects. Let's say we needed to find the array element with id equal to 200. We can see it's
 the fourth element, so we could refer to it by using `response.alerts[4]`. But, what if one or more of the other alerts disappears? The correct way
@@ -188,6 +199,20 @@ having a key named "id" equal to the value 200, regardless of its position withi
 The choose() function takes two or more arguments (usually more than two). The first argument is an index, and the second a default value. The function returns
 its (index+2)th argument, if it exists, or the default value otherwise. For example, choose(3, "no", "first", "second", "third", "fourth") returns "third",
 while choose(9, "no", ...same list...) returns "no". This allows you to quickly index numeric values to strings.
+
+#### Query Status ####
+
+For JSON responses, in addition to the *response* container for the data returned by the server, SiteSensor provides a
+*state* container with the following fields:
+
+* *valid* -- 0 or 1 (false or true) to indicate if the *response* container contains valid data;
+* *timestamp* -- the Unix timestamp of the server response;
+* *httpStatus* -- the HTTP status returned by the server (200=OK, etc.);
+* *jsonStatus* -- the result of the JSON decoding of any data returned by the server ("OK" or an error message).
+
+A simple trip expression, for example, might be `status.valid != 1`, which would case the device to enter tripped
+state any time the server response isn't valid (this is effectively the same as choosing the URL/response error
+trigger--it's just an example).
 
 ## Troubleshooting ##
 
