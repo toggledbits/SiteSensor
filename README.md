@@ -1,27 +1,79 @@
-SiteSensor
-=============
+# SiteSensor #
 
 ## Introduction ##
 
-SiteSensor is a plugin for the MiOS home automation operating system used on MiCasaVerde Vera gateway/controllers.
-It periodically makes requests of a remote HTTP server and scans the response body for a pattern string. When matched,
-the virtual sensor shows tripped. SiteSensor can store all or part of the string matched as well, making it possible
-to use as a remote data retrieval mechanism (i.e. it can make a request of a RESTful or similar API and store the
-result).
-Currently, only HTTP is supported, but future plans include support for any type of
-TCP socket connection, and send/expect strings.
+SiteSensor is a plugin for Vera home automation system controllers that periodically makes requests of a remote  
+server. Based on the response, it sets its "tripped" state (acting as a SecuritySensor device), and can also store
+parsed values from JSON data. This makes it possible to use a remote RESTful API without writing a plugin.
+
+Currently, only HTTP/HTTPS GET queries are supported, but future plans include support for additional HTTP methods,
+and direct TCP socket connections.
+
+SiteSensor is written and supported by Patrick Rigney, aka rigpapa on the Vera forums. For more information,
+see <http://www.toggledbits.com/>.
 
 ## Installation ##
 
+The plugin is currently in beta test, so it cannot be installed from the Vera plugin store.
+
+To install the plugin, download a release ZIP package from this site, and use the "Apps > Develop Apps > Luup Files"
+page in the Vera console to upload the plugin files individually (not the ZIP file itself). 
+Then create a device (Apps > Develop Apps > Create Device) with the following attributes (copy/paste recommended):
+
+* Device Type: `urn:schemas-toggledbits-com:device:SiteSensor:1`
+* Description: `SiteSensor`
+* Upnp Device Filename: `D_SiteSensor1.xml`
+* Upnp Implementation Filename: `I_SiteSensor1.xml`
+
+Note that even though only two files are named above, you must still upload all of the files in the ZIP package.
+
 ## Simple Configuration ##
 
-### Parameter ###
+Configuration of SiteSensor is through the Device Settings page on the Vera Dashboard.
 
-Parameter use/meaning/restrictions.
+### RequestURL ###
 
-### Parameter ###
+This is the URL to be queried. It must be HTTP or HTTPS. Only the GET method is currently supported, and you cannot
+add headers (e.g. Bearer, for authentication) currently, but this is planned.
 
-Parameter use/meaning/restrictions.
+### Request Interval ###
+
+The request interval is the number of seconds between requests to the configured URL. This must be an integer > 60.
+The default is 1800 (30 minutes).
+
+### Query Only When Armed ###
+
+This checkbox, which is on by default, causes SiteSensor to only query the configured URL when it is in "armed" state.
+When disarmed, SiteSensor will not make queries.
+
+### Request Timeout ###
+
+This is the amount of time (in seconds) with which the server must respond before it is considered unreachable.
+Any integer > 0 can be entered, but be conscious of the fact that performance of the Internet, your network, and the
+server being queried, can case spurious "failure" notices for very small values. Giving your remote server at least
+10 seconds to respond is recommended.
+
+### Response Type ###
+
+Currently, SiteSensor can handle responses in two ways: as text, or as JSON data. The default is text. For information
+on handling JSON responses, see the Advanced Configuration section.
+
+### Trigger Type ###
+
+SiteSensor operates as a SecuritySensor class device, so it has a "triggered" property, just as an alarm sensor in that class, 
+like a motion detector, would.
+Setting the trigger type determines how SiteSensor will control its "triggered" status.
+
+The default trigger type is "URL unreachable or server responds with error." In this case, any problem receiving a valid
+response from the server causes the SiteSensor device to enter triggered state. A successful query restores it from triggered
+state. This trigger type is available with any response type.
+
+There are two pattern match states, one for positive match, and one for negative match. These cause SiteSensor to look for
+a string in the returned result text, and are therefore only available when the response type is text. For a positive match, 
+the SiteSensor device will enter triggered state if the pattern string is found in the response text. For a negative match, the
+device is only triggered if the pattern is *not* found in the response text.
+
+Additional trigger types applies to JSON responses, and are documented under Advanced Configuration below.
 
 ## Advanced Configuration ##
 
@@ -29,21 +81,31 @@ Parameter use/meaning/restrictions.
 
 SiteSensor can retrieve and parse JSON from the remote server. You can then use expressions to fetch values from the
 decoded data and store those in SiteSensor state variables (which are visible to Lua, PLEG, etc). Evaluation of an
-expression using the decoded data can also be used to set the SiteSensor device's //tripped// state.
+expression using the JSON data can also be used to set the SiteSensor device's *tripped* state.
 
-SiteSensor will evaluate up to 8 expressions and store the results. The results are stored in variables named `Value1`,
-`Value2`, ..., `Value8`. 
+To configure SiteSensor for JSON response, set the "Response Type" field to *JSON data*.
 
-The special "Trip Condition" expression, if provided, will set SiteSensor's tripped state to the result of the expression
-evaluation. For these purposes, if the expression result is a *numeric* value, 0 evaluates to *false* and anything else is
-*true*; for *string* results, the empty string is *false* and any non-empty string is *true*; otherwise, nil or empty means
-*false* and anything else means *true*. If the Trip Condition is not provided, the device's tripped state follows the 
-success of the last query (tripped on error, not tripped if valid response). 
+#### Trip Conditions ####
+
+By default, SiteSensor's triggering mechanism follows the success of the query. That is, if the query fails, SiteSensor
+enters triggered state. When the response type is JSON data, the pattern-matching options for trigger type are disabled,
+and an additional option is presented: "When the result of an exression is true". This allows the entry of an expression
+which is evaluated against the response data, and if the expression is (logically) true, the device enters triggered state.
+The following conditions apply:
+
+* Boolean *true* and *false* mean what they normally mean;
+* For numeric results, integer zero (0) is considered *false* and anything else is *true*;
+* For string results, the empty string is *false* and any non-empty (length > 0) string is *true*;
+* For anything else, Lua *nil* is *false* and anything else is *true*.
 
 #### Expressions ####
 
+SiteSensor will evaluate up to 8 expressions and store the results. The results are stored in variables named `Value1`,
+`Value2`, ..., `Value8`.  These variables send events when their value changes, so you can use them as triggers for 
+scenes and Lua.
+
 Expressions work pretty much as expected, with standard operator precedence, grouping (and nesting) with parentheses, 
-and a small library of helpful functions. 
+and a small library of helpful functions. The syntax is similar to that of Lua.
 
 Expressions use dot notation to navigate the tree of values in the decoded JSON response. Let's consider this JSON response. We'll use it for all of the examples in this section:
 
@@ -52,7 +114,7 @@ Expressions use dot notation to navigate the tree of values in the decoded JSON 
    "status":"OK",
    "timestamp":"1484492903",
    "temperature":{  
-      "value":"72",
+      "degrees":"72",
       "unit":"fahrenheit"
    },
    "listitems":[  
@@ -78,7 +140,7 @@ Expressions use dot notation to navigate the tree of values in the decoded JSON 
          "id":"177",
          "text":"Door prop alarm",
          "code":"4100",
-         "since":"1484492903",
+         "since":"1484493071",
          "zone":"13"
       },
       {  
@@ -93,14 +155,17 @@ Expressions use dot notation to navigate the tree of values in the decoded JSON 
 }
 ```
 
+SiteSensor places the returned JSON data underneath a key called "response". An additional key, "status", contains information
+about the query itself and is explained later.
+
 The simplest elements in this data to access are those at the "root" of the tree, such as "status". This would be returned by simply
-using the expression `status`. Elements nested within other elements are accessed by navigating through the parent, so accessing
-the current temperature in this example would be `temperature.value`.
+using the expression `response.status`. Elements nested within other elements are accessed by navigating through the parent, so accessing
+the current temperature in this example would be `response.temperature.degrees`.
 
 You can do math on a referenced value in the usual way. For example, to convert the current temperature to celsius, we would
-use the expression `(temperature.value-32)*5/9`. Note that we've also used parentheses to control precedence here. Multiplication
+use the expression `(response.temperature.degrees-32)*5/9`. Note that we've also used parentheses to control precedence here. Multiplication
 and division both have higher operator precedence than subtraction, so without the parentheses, this expression would first evaluate
-32*5/9 and then subtract that result from `temperature.value`, which would be incorrect. Nesting of parentheses is permitted, of course.
+32*5/9 and then subtract that result from `response.temperature.degrees`, which would be incorrect. Nesting of parentheses is permitted, of course.
 
 Operators (in order of precedence from highest to lowest): *, /, %; +, -; <, <=, >, >= (magnitude comparison); ==, != (equality and inequality); & (binary AND); ^ (binary NOT); | (binary OR).
 
@@ -108,23 +173,21 @@ The expression evaluator has a modest library of functions as well:
 
 Math functions: abs(n), sin(n), cos(n), tan(n), sgn(n), floor(n), ceil(n), round(n), exp(n), pow(n, m), sqrt(n), min(n,m), max(n,m)
 
-String functions: len(s), find(s,t,p), sub(s,p,l), cat(s, ...), upper(s), lower(s), tonumber(s,n), tobool(s), format(s, ...)
+String functions: len(s), find(s, p [,i]), sub(s, n [,l]), upper(s), lower(s), tonumber(s [,n]), tostring(v)
 
-Other functions: time(), tostring(v)
+Other functions: time(), strftime( fmt [,t] ), choose( n, d, v1, v2, ...), select( obj, key, val )
 
-Array elements can be accessed using square brackets and the desired element number. The value of the third element in `listitems` 
-in our example would therefore be returned using the expression `listitems[3]`. Array subscripts can also be strings.
+Array elements can be accessed using square brackets and the desired element number. The value of the third element in `response.listitems` 
+in our example would therefore be returned using the expression `response.listitems[3]`. Array subscripts can also be strings.
 
-Now, the "alerts" array is an interesting case. Let's say we needed to find the array element with id=200. We can see it's
-the fourth element, so we could refer to it by using `alerts[4]`. But, what if one or more of the other alerts disappears? The correct way
-to find the element in this array is to use special array subscript notation. This example returns the "text" element of the array object
-having id=200: `alerts[id="200"].text`
+The "alerts" array is an interesting case--it's an array of objects. Let's say we needed to find the array element with id equal to 200. We can see it's
+the fourth element, so we could refer to it by using `response.alerts[4]`. But, what if one or more of the other alerts disappears? The correct way
+to find the element in this array is to use the select() function: select(response.alerts, "id", 200). The result of this function is the object
+having a key named "id" equal to the value 200, regardless of its position within the alerts array.
 
-FUTURE: You can also nest JSON data in an expression. For example, `{ "firstname": "toggled", "lastname": "bits" }` would evaluate to a JSON
-object with two elements, "firstname" and "lastname". The following example uses an object created on-the-fly to use as a map for converting
-the temperature unit name in our example to a one-letter display indicator. The result value of this expression is "F" if the unit is fahrenheit,
-and "C" if the unit is celsius: `{"fahrenheit":"F", "Celsius":"C"}[temperature.unit]`. Numeric arrays can also be created and used this way: 
-`[100,200,300,400][3]` returns 300.
+The choose() function takes two or more arguments (usually more than two). The first argument is an index, and the second a default value. The function returns
+its (index+2)th argument, if it exists, or the default value otherwise. For example, choose(3, "no", "first", "second", "third", "fourth") returns "third",
+while choose(9, "no", ...same list...) returns "no". This allows you to quickly index numeric values to strings.
 
 ## Troubleshooting ##
 
@@ -132,7 +195,7 @@ and "C" if the unit is celsius: `{"fahrenheit":"F", "Celsius":"C"}[temperature.u
 
 <dl>
     <dt>How long is a piece of string?</dt>
-    <dd>It's entire length from one end to the other, measured in either direction.</dd>
+    <dd>Its entire length from one end to the other, measured in either direction.</dd>
 </dl>        
 
 ## Reporting Bugs/Enhancement Requests ##
@@ -141,4 +204,4 @@ Bug reports and enhancement requests are welcome! Please use the "Issues" link f
 
 ## License ##
 
-SiteSensor is offered under GPL (the GNU Public License). See the LICENSE file for details.
+SiteSensor is offered under GPL (the GNU Public License) 3.0. See the LICENSE file for details.

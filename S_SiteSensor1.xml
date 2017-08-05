@@ -88,8 +88,8 @@
             <argumentList>
                 <argument>
                     <name>ResultValue</name>
-                    <direction>out</direction>
                     <relatedStateVariable>Interval</relatedStateVariable>
+                    <direction>out</direction>
                 </argument>
             </argumentList>
         </action>
@@ -108,8 +108,8 @@
             <argumentList>
                 <argument>
                     <name>ResultValue</name>
-                    <direction>out</direction>
                     <relatedStateVariable>RequestURL</relatedStateVariable>
+                    <direction>out</direction>
                 </argument>
             </argumentList>
         </action>
