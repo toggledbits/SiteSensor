@@ -79,7 +79,7 @@ local nativeFuncs = {
     , ['find']  = { nargs = 2, impl = function( argv ) local st = tostring(argv[1]) local p = tostring(argv[2]) local i = argv[3] or 1 return string.find(st, p, i) end }
     , ['upper'] = { nargs = 1, impl = function( argv ) return string.upper(tostring(argv[1])) end }
     , ['lower'] =  { nargs = 1, impl = function( argv ) return string.lower(tostring(argv[1])) end }
-    , ['tonumber]' = { nargs = 1, impl = function( argv ) return tonumber(argv[1], argv[2] or 10) end }
+    , ['tonumber'] = { nargs = 1, impl = function( argv ) return tonumber(argv[1], argv[2] or 10) end }
     , ['time']  = { nargs = 0, impl = function() return os.time() end }
     , ['choose'] = { nargs = 2, impl = function( argv ) local ix = argv[1] if ix < 1 or ix > (#argv-2) then return argv[2] else return argv[ix+2] end end }
     , ['select'] = { nargs = 3, impl = function( argv ) return select(argv[1],argv[2],argv[3]) end }

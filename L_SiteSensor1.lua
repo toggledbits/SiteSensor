@@ -64,31 +64,23 @@ local function trace( typ, msg )
 end
 
 local function L(msg, ...)
-    local str
     if type(msg) == "table" then
         str = msg["prefix"] .. msg["msg"]
     else
         str = "SiteSensor: " .. msg
     end
-    local ipos = 1
-    while true do
-        local i, j, n
-        i, j, n = string.find(str, "%%(%d+)", ipos)
-        if i == nil then break end
-        n = tonumber(n, 10)
-        if n >= 1 and n <= table.getn(arg) then
+    str = string.gsub(str, "%%(%d+)", function( n )
+            n = tonumber(n, 10)
+            if n < 1 or n > #arg then return "nil" end
             local val = arg[n]
             if type(val) == "table" then
-                val = dkjson.encode(val)
+                return dkjson.encode(val)
+            elseif type(val) == "string" then
+                return string.format("%q", val)
             end
-            if i == 1 then
-                str = tostring(val) .. string.sub(str, j+1)
-            else
-                str = string.sub(str, 1, i-1) .. tostring(val) .. string.sub(str, j+1)
-            end
+            return tostring(val)
         end
-        ipos = j + 1
-    end
+    )
     luup.log(str)
     if traceMode then
         pcall( trace, "log", str )
@@ -260,11 +252,12 @@ function scheduleNext()
         D("scheduleNext() next coming a little sooner, reducing delay from %1 to %2", delay, nextDelay)
         delay = nextDelay
     end
-    luup.call_delay("runQuery", delay)
-    D("scheduleNext() scheduled next runQuery() for %1", delay)
+    luup.call_delay("siteSensorRunQuery", delay)
+    L("next query in %1", delay)
 end
 
 local function doRequest(url, method, body)
+    local logRequest = (getVarNumeric("LogRequests", 0) ~= 0) or debugMode
     if method == nil then method = "GET" end
 
     -- A few other knobs we can turn
@@ -285,6 +278,16 @@ local function doRequest(url, method, body)
     else
         src = nil
     end
+    
+    local moreHeaders = luup.variable_get(MYSID, "Headers", luup.device) or ""
+    if string.len(moreHeaders) > 0 then
+        local h,_ = split(moreHeaders, "|")
+        local ix,nh
+        for ix,nh in ipairs(h) do
+            nh = string.gsub(nh, "%%(..)", function( c ) return string.char(tonumber(c,16)) end)
+            table.insert(tHeaders, nh)
+        end
+    end
 
     -- HTTP or HTTPS?
     local requestor
@@ -298,7 +301,9 @@ local function doRequest(url, method, body)
     local respBody, httpStatus, httpHeaders
     local r = {}
     http.TIMEOUT = timeout -- N.B. http not https, regardless
-    D("doRequest() %1 %2, headers=%3", method, url, tHeaders)
+    if logRequest then 
+        L("HTTP %2 %1, headers=%3", url, method, tHeaders)
+    end
     respBody, httpStatus, httpHeaders = requestor.request{
         url = url,
         source = src,
@@ -311,6 +316,10 @@ local function doRequest(url, method, body)
 
     -- Since we're using the table sink, concatenate chunks to single string.
     respBody = table.concat(r)
+    
+    if logRequest then
+        L("Response status %1 with %2 in body", httpStatus, string.len(respBody))
+    end
 
     -- See what happened. Anything 2xx we reduce to 200 (OK).
     if httpStatus >= 200 and httpStatus <= 299 then
@@ -320,7 +329,9 @@ local function doRequest(url, method, body)
     return true, respBody, httpStatus
 end
 
-local function doMatchQuery( type )
+local function doMatchQuery( type, method )
+    if method == nil then method = "GET" end
+    local logRequest = (getVarNumeric("LogRequests", 0) ~= 0) or debugMode
     local url = luup.variable_get(MYSID, "RequestURL", luup.device) or ""
     local pattern = luup.variable_get(MYSID, "Pattern", luup.device) or "^HTTP/1.. 200"
     local timeout = getVarNumeric("Timeout", 60)
@@ -341,12 +352,28 @@ local function doMatchQuery( type )
         requestor = http
     end
 
+    local tHeaders = {}
+    local moreHeaders = luup.variable_get(MYSID, "Headers", luup.device) or ""
+    if string.len(moreHeaders) > 0 then
+        local h,_ = split(moreHeaders, "|")
+        local ix,nh
+        for ix,nh in ipairs(h) do
+            nh = string.gsub(nh, "%%(..)", function( c ) return string.char(tonumber(c,16)) end)
+            table.insert(tHeaders, nh)
+        end
+    end
+
     D("doMatchQuery() seeking %1 in %2", pattern, url)
 
     http.TIMEOUT = timeout
     setMessage("Requesting...")
+    if logRequest then 
+        L("HTTP %2 %1, headers=%3", url, method, tHeaders)
+    end
     cond, httpStatus, httpHeaders = requestor.request {
+        method = method,
         url = url,
+        headers = tHeaders,
         redirect = false,
         sink = function(chunk, source_err)
             if chunk == nil then
@@ -389,7 +416,11 @@ local function doMatchQuery( type )
         body is read (because the sink keeps looking for the pattern and doesn't find it), but in that case, request()
         returns the expected/documented "cond=1,httpStatus=200" response.
     ]]
-    D("doMatchQuery() returned from request(), cond=%1, httpStatus=%2, httpHeaders=%3", cond, httpStatus, httpHeaders)
+    D("doMatchQuery() returned from request(), cond=%1, httpStatus=%2, httpHeaders=%3", cond or "nil", httpStatus, httpHeaders)
+    if logRequest then
+        L("Response status %1 with matched %2", httpStatus, matched)
+    end
+
     if cond == nil or (cond == 1 and httpStatus == 200) then
         if matched then
             setMessage("Valid response; matched!")
@@ -402,6 +433,7 @@ local function doMatchQuery( type )
         end
     else
         setMessage("Invalid response (" .. tostring(httpStatus) .. ")")
+        luup.variable_set(MYSID, "LastMatchValue", "", luup.device)
         err = true
     end
 

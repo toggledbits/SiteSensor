@@ -45,10 +45,19 @@ var SiteSensor = (function(api) {
             var i, j, roomObj, roomid, html = "";
             
             // Request URL
+            html += "<div class=\"pull-left\">";
             html += "<h2>Request URL</h2><label for=\"requestURL\">Enter the URL to be queried:</label><br/>";
             html += "<textarea type=\"text\" rows=\"3\" cols=\"64\" wrap=\"soft\" id=\"requestURL\" />";
-
+            html += "</div>";
+            
+            // Request Headers
+            html += "<div class=\"pull-left\">";
+            html += "<h2>Request Headers</h2><label for=\"requestHeaders\">Enter request headers, one per line:</label><br/>";
+            html += "<textarea type=\"text\" rows=\"3\" cols=\"64\" wrap=\"soft\" id=\"requestHeaders\" />";
+            html += "</div>";
+            
             // Request interval
+            html += "<div class=\"clearfix\"></div>";
             html += "<h2>Request Interval</h2><label for=\"timeout\">Enter the number of seconds between requests:</label><br/>";
             html += "<input type=\"text\" size=\"5\" maxlength=\"5\" class=\"numfield\" id=\"interval\" />";
             html += " <input type=\"checkbox\" value=\"1\" id=\"queryarmed\">&nbsp;Query only when armed";
@@ -104,9 +113,24 @@ var SiteSensor = (function(api) {
             // Restore values
             var s;
             s = api.getDeviceState(myDevice, serviceId, "RequestURL");
-            if (s !== undefined) jQuery("#requestURL").val(s).change( function( obj ) {
+            jQuery("#requestURL").val(s ? s : "").change( function( obj ) {
                 var newUrl = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "RequestURL", newUrl, 0);
+            });
+            
+            s = api.getDeviceState(myDevice, serviceId, "Headers");
+            if (s) {
+                // decode
+                s = s.replace(/\|/g, "\n"); /* list breaks back to newlines */
+                s = s.replace(/%(..)/g, function( m, p1 ) { return String.fromCharCode(Number.parseInt(p1,16)); } ); /* restore escaped */
+            }
+            jQuery("#requestHeaders").val(s ? s : "").change( function( obj ) {
+                var newText = jQuery(this).val();
+                // encode
+                newText = newText.replace(/\s+$/, ""); /* trim */
+                newText = newText.replace(/([|%]|[^[:print:]])/g, function( m ) { return "%" + m.charCodeAt(0).toString(16); } ); /* escape our separator and non-printable */
+                newText = newText.replace(/\s*(\r|\n|\r\n)/g, "|"); /* Convert newlines to our list breaks */
+                api.setDeviceStatePersistent(myDevice, serviceId, "Headers", newText, 0);
             });
             
             s = parseInt(api.getDeviceState(myDevice, serviceId, "Interval"));
@@ -138,7 +162,7 @@ var SiteSensor = (function(api) {
             });
             
             s = api.getDeviceState(myDevice, serviceId, "ResponseType");
-            if (s !== undefined) jQuery('select#rtype option[value="' + s + '"]').prop('selected', true);
+            if (s) jQuery('select#rtype option[value="' + s + '"]').prop('selected', true);
             jQuery('select#rtype').change( function( obj ) {
                 var newType = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "ResponseType", newType, 0);
@@ -146,7 +170,7 @@ var SiteSensor = (function(api) {
             });
             
             s = api.getDeviceState(myDevice, serviceId, "Trigger");
-            if (s !== undefined) jQuery('select#trigger option[value="' + s + '"]').prop('selected', true);
+            if (s) jQuery('select#trigger option[value="' + s + '"]').prop('selected', true);
             jQuery('select#trigger').change( function( obj ) {
                 var newType = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "Trigger", newType, 0);
@@ -154,13 +178,13 @@ var SiteSensor = (function(api) {
             });
 
             s = api.getDeviceState(myDevice, serviceId, "Pattern");
-            if (s !== undefined) jQuery("input#pattern").val(s).change( function( obj ) {
+            if (s) jQuery("input#pattern").val(s).change( function( obj ) {
                 var newPat = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "Pattern", newPat, 0);
             });
             
             s = api.getDeviceState(myDevice, serviceId, "TripExpression");
-            if (s !== undefined) jQuery("input#tripexpression").val(s).change( function( obj ) {
+            if (s) jQuery("input#tripexpression").val(s).change( function( obj ) {
                 var newExpr = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "TripExpression", newExpr, 0);
             });
@@ -168,7 +192,7 @@ var SiteSensor = (function(api) {
             $('input.jsonexpr').each( function( obj ) {
                 var ix = $(this).attr('id').substr(4);
                 var s = api.getDeviceState(myDevice, serviceId, "Expr" + ix);
-                if (s !== undefined) $(this).val(s);
+                if (s) $(this).val(s);
             });
             $('input.jsonexpr').change( function( obj ) {
                 var newExpr = $(this).val();
