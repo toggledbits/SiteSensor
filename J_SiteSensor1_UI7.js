@@ -44,41 +44,57 @@ var SiteSensor = (function(api) {
 
             var i, j, roomObj, roomid, html = "";
             
+            html += "<style>";
+            html += ".tb-cgroup { padding: 0px 32px 0px 0px }"
+            html += "</style>";
+            
             // Request URL
-            html += "<div class=\"pull-left\">";
+            html += "<div class=\"tb-cgroup pull-left\">";
             html += "<h2>Request URL</h2><label for=\"requestURL\">Enter the URL to be queried:</label><br/>";
             html += "<textarea type=\"text\" rows=\"3\" cols=\"64\" wrap=\"soft\" id=\"requestURL\" />";
             html += "</div>";
             
             // Request Headers
-            html += "<div class=\"pull-left\">";
+            html += "<div class=\"tb-cgroup pull-left\">";
             html += "<h2>Request Headers</h2><label for=\"requestHeaders\">Enter request headers, one per line:</label><br/>";
             html += "<textarea type=\"text\" rows=\"3\" cols=\"64\" wrap=\"soft\" id=\"requestHeaders\" />";
             html += "</div>";
+
+            html += "<div class=\"clearfix\"></div>";
             
             // Request interval
-            html += "<div class=\"clearfix\"></div>";
+            html += "<div class=\"tb-cgroup pull-left\">";
             html += "<h2>Request Interval</h2><label for=\"timeout\">Enter the number of seconds between requests:</label><br/>";
             html += "<input type=\"text\" size=\"5\" maxlength=\"5\" class=\"numfield\" id=\"interval\" />";
             html += " <input type=\"checkbox\" value=\"1\" id=\"queryarmed\">&nbsp;Query only when armed";
+            html += "</div>";
 
-            // Request timeout
+            html += "<div class=\"tb-cgroup pull-left\">";
             html += "<h2>Request Timeout</h2><label for=\"timeout\">Timeout (seconds):</label><br/>";
             html += "<input type=\"text\" size=\"5\" maxlength=\"5\" class=\"numfield\" id=\"timeout\" />";
+            html += "</div>";
 
-            // Query Type
+            html += "<div class=\"clearfix\"></div>";
+            
+            // Response Type
+            html += "<div class=\"tb-cgroup pull-left\">";
             html += "<h2>Response Type</h2><label for=\"rtype\">Server response is handled as:</label><br/>";
             html += '<select id="rtype"><option value="text">Generic (text)</option>';
             html += '<option value="json">JSON data</option>';
             html += '</select>';
+            html += "</div>";
             
             // Trigger
+            html += "<div class=\"tb-cgroup pull-left\">";
             html += "<h2>Trigger Type</h2><label for=\"trigger\">Sensor is triggered when:</label><br/>";
             html += '<select id="trigger"><option value="err">URL unreachable or server replies with error</option>';
             html += '<option value="match">Response matches pattern</option>';
             html += '<option value="neg">Response does not match pattern</option>';
             html += '<option value="expr">The result of an expression is true</option>';
             html += '</select>';
+            html += "</div>";
+
+            html += "<div class=\"clearfix\"></div>";
             
             // Response pattern
             html += '<div class="tb-textcontrols">';
@@ -88,7 +104,7 @@ var SiteSensor = (function(api) {
 
             // Trip Expression
             html += '<div class="tb-jsoncontrols">';
-            html += "<h2>Trip Expression</h2><label for=\"tripexpression\">If the sensor trigger type (above) is 'result of an expression', enter the expression:</label><br/>";
+            html += "<h2>Trip Expression</h2><label for=\"tripexpression\">If the Trigger Type (above) is 'result of an expression', enter the expression below (true result=triggered):</label><br/>";
             html += "<input type=\"text\" size=\"64\" id=\"tripexpression\" />";
             
             // Expressions for drawing out field values
@@ -100,8 +116,8 @@ var SiteSensor = (function(api) {
             }
             html += "</ol>";
             
-            html += '<p>The JSON data is encapsulated within a "response" key, so if your JSON data looks like the example below, the value <i>status</i> would be accessed by the expression <tt>response.status</tt>, while the value <i>name</i> would be accessed using <tt>response.type.name</tt>. Refer to the <a href="#">documentation</a> for more details.</p>';
-            html += "<code>{\n    \"status\": 0,\n    \"type\": {\n        \"name\": \"Normal\",\n        \"class\": \"apiobject\"\n    }\n}</code>";
+            html += '<p>The JSON data is encapsulated within a "response" key, so if your JSON data looks like the example below, the value <i>errCode</i> would be accessed by the expression <tt>response.errCode</tt>, while the value <i>name</i> would be accessed using <tt>response.type.name</tt>. Refer to the <a href="#">documentation</a> for more details.</p>';
+            html += "<code>{\n    \"errCode\": 0,\n    \"type\": {\n        \"name\": \"Normal\",\n        \"class\": \"apiobject\"\n    }\n}</code>";
             
             html += "</div>"; // tb-jsoncontrols
             
