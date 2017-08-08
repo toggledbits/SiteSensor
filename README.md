@@ -2,7 +2,7 @@
 
 ## Introduction ##
 
-SiteSensor is a plugin for Vera home automation system controllers that periodically makes requests of a remote  
+SiteSensor is a plugin for Vera home automation controllers that periodically makes requests of a remote  
 server. Based on the response, it sets its "tripped" state (acting as a SecuritySensor device), and can also store
 parsed values from JSON data. This makes it possible to use a remote RESTful API without writing a plugin.
 
@@ -206,12 +206,12 @@ usage, `response.temperature.degrees` and `response['temperature']['degrees']` a
 
 The "alerts" array is an interesting case--it's an array of objects. Let's say we needed to find the array element with id equal to 200. We can see it's
 the fourth element, so we could refer to it by using `response.alerts[4]`. But, what if one or more of the other alerts disappears? The correct way
-to find the element in this array is to use the select() function: select(response.alerts, "id", 200). The result of this function is the object
+to find the element in this array is to use the *select()* function: `select(response.alerts, "id", 200)`. The result of this function is the object
 having a key named "id" equal to the value 200, regardless of its position within the alerts array.
 
-The choose() function takes two or more arguments (usually more than two). The first argument is an index, and the second a default value. The function returns
-its (index+2)th argument, if it exists, or the default value otherwise. For example, choose(3, "no", "first", "second", "third", "fourth") returns "third",
-while choose(9, "no", ...same list...) returns "no". This allows you to quickly index numeric values to strings.
+The *choose()* function takes two or more arguments (usually more than two). The first argument is an index, and the second a default value. The function returns
+its *(index+2)th* argument, if it exists, or the default value otherwise. For example, `choose(3, "no", "first", "second", "third", "fourth")` returns "third",
+while `choose(9, "no", *...same list...*)` returns "no". This allows you to quickly index numeric values to strings.
 
 #### Query Status ####
 
@@ -232,8 +232,8 @@ trigger--it's just an example).
 ## FAQ ##
 
 <dl>
-    <dt>How long is a piece of string?</dt>
-    <dd>Its entire length from one end to the other, measured in either direction.</dd>
+    <dt>Can SiteSensor handle XML responses like it does JSON?</dt>
+    <dd>That is planned, but not yet available.</dd>
 </dl>        
 
 ## Reporting Bugs/Enhancement Requests ##
