@@ -245,7 +245,7 @@ function scheduleNext()
     local nextQuery = getVarNumeric("LastRun", 0) + delay
     local now = os.time()
     local nextDelay = nextQuery - now
-    if nextDelay < 0 then
+    if nextDelay <= 0 then
         -- We missed an interval completely
         D("scheduleNext() next should have been %1, now %2, we missed it!", nextQuery, now)
         delay = 1
@@ -580,6 +580,9 @@ local function doJSONQuery(url)
 end
 
 function runQuery()
+    -- Save current time (before things start happening).
+    luup.variable_set(MYSID, "LastRun", os.time(), luup.device)
+
     -- We may only query when armed, so check that.
     local queryArmed = getVarNumeric("QueryArmed", 1)
     if queryArmed == 0 or isArmed() then
@@ -598,8 +601,6 @@ function runQuery()
         setMessage("Disarmed; query skipped.")
     end
 
-    -- Run next interval
-    luup.variable_set(MYSID, "LastRun", os.time(), luup.device)
     scheduleNext()
 end
 
