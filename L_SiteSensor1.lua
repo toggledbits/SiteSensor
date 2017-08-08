@@ -5,7 +5,8 @@
 --
 -- TO-DO:
 --   TCP direct
---   Headers and type (GET, PUT, etc.) for HTTP (e.g. Bearer for authentication)
+--   More types (POST, PUT, etc.) for HTTP(S)
+--   XML?
 -- -----------------------------------------------------------------------------
 module("L_SiteSensor1", package.seeall)
 
