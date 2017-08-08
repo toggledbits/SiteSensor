@@ -42,10 +42,23 @@ Configuration of SiteSensor is through the Device Settings page on the Vera Dash
 This is the URL to be queried. It must be HTTP or HTTPS. Only the GET method is currently supported, and you cannot
 add headers (e.g. Bearer, for authentication) currently, but this is planned.
 
+### Request Headers ###
+
+If the site you are probing requires some kind of additional header(s) (for example, for authentication), you can
+supply those headers in this field. They must be formatted in the usual HTTP syntax: `Header: Value`. If you have 
+multiple, list them one per line. Note that any automatic wrapping of lines longer than the field width 
+does not cause a newline to be inserted into the header.
+
 ### Request Interval ###
 
-The request interval is the number of seconds between requests to the configured URL. This must be an integer > 60.
-The default is 1800 (30 minutes).
+The request interval is the number of seconds between requests to the configured URL. This must be an integer >= 60.
+The default is 1800 (30 minutes). SiteSensor attempts to "keep a schedule", querying as close to the desired interval
+as possible. Any interruption of service to the Vera or SiteSensor (e.g. reboot, power failure, etc.) does not affect
+the timing of queries, unless it is longer than the request interval. For example, let's say we're set up for the
+default 1800 second (30 minute) interval, and SiteSensor makes a query at 8:02am, but the power then fails at 8:15am.
+As long as power is restored and the Vera rebooted by 8:32am, the query will happen then. If the event delays the
+request past 8:32am, then as soon as SiteSensor restarts it will make a query, and further queries will continue 
+on 30 minute intervals from then.
 
 ### Query Only When Armed ###
 
@@ -56,7 +69,7 @@ When disarmed, SiteSensor will not make queries.
 
 This is the amount of time (in seconds) with which the server must respond before it is considered unreachable.
 Any integer > 0 can be entered, but be conscious of the fact that performance of the Internet, your network, and the
-server being queried, can case spurious "failure" notices for very small values. Giving your remote server at least
+server being queried, can cause spurious "failure" notices for very small values. Giving your remote server at least
 10 seconds to respond is recommended.
 
 ### Response Type ###
