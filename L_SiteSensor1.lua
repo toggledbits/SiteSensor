@@ -10,7 +10,7 @@
 -- -----------------------------------------------------------------------------
 module("L_SiteSensor1", package.seeall)
 
-local _VERSION = "1.0"
+local _VERSION = "1.0.1"
 local _CONFIGVERSION = 10000
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
