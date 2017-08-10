@@ -10,7 +10,7 @@
 -- -----------------------------------------------------------------------------
 module("L_SiteSensor1", package.seeall)
 
-local _VERSION = "1.0"
+local _VERSION = "1.0.1"
 local _CONFIGVERSION = 10000
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
@@ -433,9 +433,11 @@ local function doMatchQuery( type, method )
         if (lastVal == nil or lastVal ~= matchValue) then
             luup.variable_set(MYSID, "LastMatchValue", matchValue, luup.device)
         end
+        fail(false)
     else
         setMessage("Invalid response (" .. tostring(httpStatus) .. ")")
         luup.variable_set(MYSID, "LastMatchValue", "", luup.device)
+        fail(true)
         err = true
     end
 
