@@ -14,7 +14,7 @@
         <stateVariable sendEvents="no">
             <name>Interval</name>
             <dataType>ui4</dataType>
-            <defaultValue>0</defaultValue>
+            <defaultValue>1800</defaultValue>
             <shortCode>interval</shortCode>
         </stateVariable>
         <stateVariable sendEvents="yes">
