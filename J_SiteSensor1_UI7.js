@@ -7,8 +7,6 @@ var SiteSensor = (function(api) {
 
     var myModule = {};
 
-    var myDevice = api.getCpanelDeviceId();
-
     function updateResponseFields() {
         var rtype = jQuery('select#rtype').val();
         jQuery('select#trigger option[value="match"]').attr('disabled', rtype != "text");
@@ -42,6 +40,8 @@ var SiteSensor = (function(api) {
         try {
             initPlugin();
 
+            var myDevice = api.getCpanelDeviceId();
+            
             var i, j, roomObj, roomid, html = "";
 
             html += "<style>";
