@@ -2,18 +2,18 @@
 <implementation>
     <functions>
         -- -------------------------------------------------------------------------------------------------------------------------
-        -- Deus Ex Machina (II)
-        -- https://github.com/toggledbits/DeusExMachina
-        -- Original code and releases 1.x by Andy Lintner (beowulfe) Version 2.0 and beyond by Patrick Rigney (rigpapa/toggledbits).
-        -- A big thanks to Andy for passing the torch so that this great plug-in can live on.
+        -- SiteSensor
+        -- https://github.com/toggledbits/SiteSensor
+        -- Patrick Rigney, patrick@toggledbits.com
         -- -------------------------------------------------------------------------------------------------------------------------
         function startupSiteSensor(dev)
-            luup.log("SiteSensor STARTUP!")
+            luup.log("SiteSensor Plugin START-UP!")
             SiteSensor = require("L_SiteSensor1")
-            runQuery = SiteSensor.runQuery
+            siteSensorRunQuery = SiteSensor.runQuery
             SiteSensor.init(dev)
         end
     </functions>
+    <files>L_LuxaXP.lua</files>
     <startup>startupSiteSensor</startup>
     <actionList>
         <action>

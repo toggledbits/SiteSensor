@@ -1,0 +1,8 @@
+FUTURE: Shortcut subscript notation instead of function? e.g. alerts[id=200] ???
+
+FUTURE: You can also nest JSON data in an expression. For example, `{ "firstname": "toggled", "lastname": "bits" }` would evaluate to a JSON
+object with two elements, "firstname" and "lastname". The following example uses an object created on-the-fly to use as a map for converting
+the temperature unit name in our example to a one-letter display indicator. The result value of this expression is "F" if the unit is fahrenheit,
+and "C" if the unit is celsius: `{"fahrenheit":"F", "Celsius":"C"}[temperature.unit]`. Numeric arrays can also be created and used this way: 
+`[100,200,300,400][3]` returns 300.
+

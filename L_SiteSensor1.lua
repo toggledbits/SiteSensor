@@ -1,33 +1,96 @@
+-- -----------------------------------------------------------------------------
+-- L_SiteSensor.lua
+-- Copyright 2016, 2017 Patrick H. Rigney, All Rights Reserved
+-- This file is available under GPL 3.0. See LICENSE in documentation for info.
+--
+-- TO-DO:
+--   TCP direct
+--   More types (POST, PUT, etc.) for HTTP(S)
+--   XML?
+-- -----------------------------------------------------------------------------
 module("L_SiteSensor1", package.seeall)
 
 local _VERSION = "0.1"
-local _CONFIGVERSION = 00100
+local _CONFIGVERSION = 00101
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local SSSID = "urn:micasaverde-com:serviceId:SecuritySensor1"
 local HASID = "urn:micasaverde-com:serviceId:HaDevice1"
 
-local debugMode = true
+local debugMode = false
+local traceMode = false
 
-local function debug(...)
-    if debugMode then
-        local str = "SiteSensor1:" .. arg[1]
-        local ipos = 1
-        while true do
-            local i, j, n
-            i, j, n = string.find(str, "%%(%d+)", ipos)
-            if i == nil then break end
+local https = require("ssl.https")
+local http = require("socket.http")
+local ltn12 = require("ltn12")
+local dkjson = require('dkjson')
+local luaxp = require("L_LuaXP")
+
+local function trace( typ, msg )
+    local ts = os.time()
+    local r
+    local t = {
+        ["type"]=typ,
+        plugin="SiteSensor",
+        pluginVersion=_CONFIGVERSION,
+        serial=luup.pk_accesspoint,
+        systime=ts,
+        sysver=luup.version,
+        longitude=luup.longitude,
+        latitude=luup.latitude,
+        timezone=luup.timezone,
+        city=luup.city,
+        message=msg
+    }
+
+    local tHeaders = {}
+    local body = dkjson.encode(t)
+    tHeaders["Content-Type"] = "application/json"
+    tHeaders["Content-Length"] = string.len(body)
+
+    -- Make the request.
+    local respBody, httpStatus, httpHeaders
+    http.TIMEOUT = 10
+    respBody, httpStatus, httpHeaders = http.request{
+        url = "http://www.toggledbits.com/luuptrace/",
+        source = ltn12.source.string(body),
+        sink = ltn12.sink.table(r),
+        method = "POST",
+        headers = tHeaders,
+        redirect = false
+    }
+    if httpStatus == 401 or httpStatus == 404 then
+        traceMode = false
+    end
+end
+
+local function L(msg, ...)
+    if type(msg) == "table" then
+        str = msg["prefix"] .. msg["msg"]
+    else
+        str = "SiteSensor: " .. msg
+    end
+    str = string.gsub(str, "%%(%d+)", function( n )
             n = tonumber(n, 10)
-            if n >= 1 and n < table.getn(arg) then
-                if i == 1 then
-                    str = tostring(arg[n+1]) .. string.sub(str, j+1)
-                else
-                    str = string.sub(str, 1, i-1) .. tostring(arg[n+1]) .. string.sub(str, j+1)
-                end
+            if n < 1 or n > #arg then return "nil" end
+            local val = arg[n]
+            if type(val) == "table" then
+                return dkjson.encode(val)
+            elseif type(val) == "string" then
+                return string.format("%q", val)
             end
-            ipos = j + 1
+            return tostring(val)
         end
-        luup.log(str)
+    )
+    luup.log(str)
+    if traceMode then
+        pcall( trace, "log", str )
+    end
+end
+
+local function D(msg, ...)
+    if debugMode then
+        L({msg=msg,prefix="SiteSensor(debug)::"}, unpack(arg))
     end
 end
 
@@ -56,21 +119,21 @@ local function split(s, sep)
 end
 
 local function parseRefExpr(ex, ctx)
-    local i, j, r
-    i, j, r = string.find(ex, "([^.]+)%.")
-    if i == nil then
-        -- No dot found, use entire string as next key
-        debug("parseRefExpr(): no dot found in %1, using as entire key", ex)
-        return ctx[ex]
-    else
-        -- Dot. If subcontext available, recurse using subcontext and remainder of expression
-        debug("parseRefExpr(): found dot in %1, traversing to %2", ex, tostring(r))
-        if ctx[r] == nil then
-            return nil
-        end
-        return parseRefExpr(string.sub(ex, j+1), ctx[r])
+    D("parseRefExpr(%1,ctx)", ex, ctx)
+    local cx, err
+    cx, err = luaxp.compile(ex)
+    if cx == nil then
+        L("parseRefExpr() failed to parse expression `%1', %2", ex, err)
+        return nil
     end
-end    
+
+    local val
+    val, err = luaxp.run(cx, ctx)
+    if val == nil then
+        L("parseRefExpr() failed to execute `%1', %2", ex, err)
+    end
+    return val
+end
 
 local function checkVersion()
     if ( luup.version_branch == 1 and luup.version_major == 7 ) then
@@ -94,6 +157,21 @@ local function setMessage(s)
     luup.variable_set(MYSID, "Message", s or "", luup.device)
 end
 
+local function isFailed()
+    local failed = getVarNumeric("Failed", 0, luup.device, MYSID)
+    return failed ~= 0
+end
+
+local function fail(failState)
+    assert(type(failState) == "boolean")
+    D("fail(%1)", failState)
+    if failState ~= isFailed() then
+        local fval = 0
+        if failState then fval = 1 end
+        luup.variable_set(MYSID, "Failed", fval, luup.device)
+    end
+end
+
 local function isArmed()
     local armed = getVarNumeric("Armed", 0, luup.device, SSSID)
     return armed ~= 0
@@ -105,39 +183,51 @@ local function isTripped()
 end
 
 local function trip(tripped)
+    assert(type(tripped) == "boolean")
+    D("trip(%1)", tripped)
     local newVal
-    if tripped then 
-        debug("trip(): marking tripped")
-        newVal = "1" 
-        luup.variable_set(SSSID, "LastTrip", os.time(), luup.device)
-    else 
-        debug("trip(): marking not tripped")
-        newVal = "0"
+    if tripped ~= isTripped() then
+        if tripped then
+            D("trip() marking tripped")
+            newVal = "1"
+            luup.variable_set(SSSID, "LastTrip", os.time(), luup.device)
+        else
+            D("trip() marking not tripped")
+            newVal = "0"
+        end
+        luup.variable_set(SSSID, "Tripped", newVal, luup.device)
+        if isArmed() then
+            D("trip() marked armed-tripped")
+            luup.variable_set(SSSID, "ArmedTripped", newVal, luup.device)
+        else
+            D("trip() not armed-tripped")
+            luup.variable_set(SSSID, "ArmedTripped", "0", luup.device)
+        end
     end
-    luup.variable_set(SSSID, "Tripped", newVal, luup.device)
-    if isArmed() then
-        debug("trip(): marked armed-tripped")
-        luup.variable_set(SSSID, "ArmedTripped", newVal, luup.device)
-    else
-        debug("trip(): not armed-tripped")
-        luup.variable_set(SSSID, "ArmedTripped", "0", luup.device)
-    end
-end    
+end
 
 local function runOnce()
     local rev = getVarNumeric("Version", 0)
     if (rev == 0) then
         -- Initialize for new installation
-        debug("runOnce(): Performing first-time initialization!")
-        luup.variable_set(SSSID, "LastTrip", "0", luup.device)
-        luup.variable_set(MYSID, "RequestURL", nil, luup.device)
+        D("runOnce() Performing first-time initialization!")
+        luup.variable_set(MYSID, "Message", "", luup.device)
+        luup.variable_set(MYSID, "RequestURL", "", luup.device)
         luup.variable_set(MYSID, "Interval", "1800", luup.device)
+        luup.variable_set(MYSID, "Timeout", "50", luup.device)
+        luup.variable_set(MYSID, "QueryArmed", "1", luup.device)
+        luup.variable_set(MYSID, "ResponseType", "text", luup.device)
+        luup.variable_set(MYSID, "Trigger", "err", luup.device)
+        luup.variable_set(MYSID, "Failed", "1", luup.device)
         luup.variable_set(MYSID, "LastQuery", "0", luup.device)
         luup.variable_set(MYSID, "LastRun", "0", luup.device)
-        luup.variable_set(MYSID, "QueryArmed", "1", luup.device)
-        luup.variable_set(MYSID, "Trigger", "match", luup.device)
+        luup.variable_set(MYSID, "LogRequests", "0", luup.device)
+        luup.variable_set(SSSID, "LastTrip", "0", luup.device)
+        luup.variable_set(SSSID, "Armed", "0", luup.device)
+        luup.variable_set(SSSID, "Tripped", "0", luup.device)
+        luup.variable_set(SSSID, "ArmedTripped", "0", luup.device)
     end
-    
+
     -- No matter what happens above, if our versions don't match, force that here/now.
     if (rev ~= _CONFIGVERSION) then
         luup.variable_set(MYSID, "Version", _CONFIGVERSION, luup.device)
@@ -151,44 +241,146 @@ function scheduleNext()
         delay = getVarNumeric("ArmedInterval", delay)
     end
     if delay < 1 then delay = 60 end
-    debug("scheduleNext(): interval is %1", delay)
+    D("scheduleNext() interval is %1", delay)
     -- Now, see if we've missed an interval
     local nextQuery = getVarNumeric("LastRun", 0) + delay
     local now = os.time()
     local nextDelay = nextQuery - now
-    if nextDelay < 0 then
+    if nextDelay <= 0 then
         -- We missed an interval completely
-        debug("scheduleNext(): next should have been %1, now %2, we missed it!", nextQuery, now)
+        D("scheduleNext() next should have been %1, now %2, we missed it!", nextQuery, now)
         delay = 1
     elseif nextDelay < delay then
-        debug("scheduleNext(): next coming a little sooner, reducing delay from %1 to %2", delay, nextDelay)
+        D("scheduleNext() next coming a little sooner, reducing delay from %1 to %2", delay, nextDelay)
         delay = nextDelay
     end
-    luup.call_delay("runQuery", delay)
-    debug("scheduleNext(): scheduled next runQuery() for %1", delay)
+    luup.call_delay("siteSensorRunQuery", delay)
+    L("next query in %1", delay)
 end
 
-local function doMatchQuery()
+local function doRequest(url, method, body)
+    local logRequest = (getVarNumeric("LogRequests", 0) ~= 0) or debugMode
+    if method == nil then method = "GET" end
+
+    -- A few other knobs we can turn
+    local timeout = getVarNumeric("Timeout", 60) -- ???
+    -- local maxlength = getVarNumeric("MaxLength", 262144) -- ???
+
+    local src
+    local tHeaders = {}
+
+    -- Build post/put data
+    if type(body) == "table" then
+        body = dkjson.encode(body)
+        tHeaders["Content-Type"] = "application/json"
+    end
+    if body ~= nil then
+        tHeaders["Content-Length"] = string.len(body)
+        src = ltn12.source.string(body)
+    else
+        src = nil
+    end
+    
+    local moreHeaders = luup.variable_get(MYSID, "Headers", luup.device) or ""
+    if string.len(moreHeaders) > 0 then
+        local h,_ = split(moreHeaders, "|")
+        local ix,nh
+        for ix,nh in ipairs(h) do
+            nh = string.gsub(nh, "%%(..)", function( c ) return string.char(tonumber(c,16)) end)
+            table.insert(tHeaders, nh)
+        end
+    end
+
+    -- HTTP or HTTPS?
+    local requestor
+    if url:lower():find("https:") then
+        requestor = https
+    else
+        requestor = http
+    end
+
+    -- Make the request.
+    local respBody, httpStatus, httpHeaders
+    local r = {}
+    http.TIMEOUT = timeout -- N.B. http not https, regardless
+    if logRequest then 
+        L("HTTP %2 %1, headers=%3", url, method, tHeaders)
+    end
+    respBody, httpStatus, httpHeaders = requestor.request{
+        url = url,
+        source = src,
+        sink = ltn12.sink.table(r),
+        method = method,
+        headers = tHeaders,
+        redirect = false
+    }
+    D("doRequest() request returned httpStatus=%1, respBody=%2", httpStatus, respBody)
+
+    -- Since we're using the table sink, concatenate chunks to single string.
+    respBody = table.concat(r)
+    
+    if logRequest then
+        L("Response status %1 with %2 in body", httpStatus, string.len(respBody))
+    end
+
+    -- See what happened. Anything 2xx we reduce to 200 (OK).
+    if httpStatus >= 200 and httpStatus <= 299 then
+        -- Success response with no data, take shortcut.
+        return false, respBody, 200
+    end
+    return true, respBody, httpStatus
+end
+
+local function doMatchQuery( type, method )
+    if method == nil then method = "GET" end
+    local logRequest = (getVarNumeric("LogRequests", 0) ~= 0) or debugMode
     local url = luup.variable_get(MYSID, "RequestURL", luup.device) or ""
     local pattern = luup.variable_get(MYSID, "Pattern", luup.device) or "^HTTP/1.. 200"
     local timeout = getVarNumeric("Timeout", 60)
     local trigger = luup.variable_get(MYSID, "Trigger", luup.device) or nil
 
-    local http = require("socket.http")
     local buf = ""
     local cond, httpStatus, httpHeaders
     local matched = false
     local err = false
     local matchValue
+    local requestor = http
+
+    -- HTTP or HTTPS?
+    local requestor
+    if url:lower():find("https:") then
+        requestor = https
+    else
+        requestor = http
+    end
+
+    local tHeaders = {}
+    local moreHeaders = luup.variable_get(MYSID, "Headers", luup.device) or ""
+    if string.len(moreHeaders) > 0 then
+        local h,_ = split(moreHeaders, "|")
+        local ix,nh
+        for ix,nh in ipairs(h) do
+            nh = string.gsub(nh, "%%(..)", function( c ) return string.char(tonumber(c,16)) end)
+            table.insert(tHeaders, nh)
+        end
+    end
+
+    D("doMatchQuery() seeking %1 in %2", pattern, url)
+
     http.TIMEOUT = timeout
     setMessage("Requesting...")
-    cond, httpStatus, httpHeaders = http.request {
+    if logRequest then 
+        L("HTTP %2 %1, headers=%3", url, method, tHeaders)
+    end
+    cond, httpStatus, httpHeaders = requestor.request {
+        method = method,
         url = url,
+        headers = tHeaders,
         redirect = false,
         sink = function(chunk, source_err)
             if chunk == nil then
                 -- no more data to process
-                debug("doMatchQuery(): chunk is nil")
+                D("doMatchQuery() chunk is nil")
                 if source_err then
                     return nil, "Source error"
                 else
@@ -199,7 +391,7 @@ local function doMatchQuery()
             else
                 buf = buf .. chunk
                 local l = string.len(buf)
-                debug("doMatchQuery(): valid chunk, buf now contains %1", l)
+                D("doMatchQuery() valid chunk, buf now contains %1", l)
                 if l > 2048 then
                     buf = string.sub(buf, l-2048+1)
                 end
@@ -226,9 +418,13 @@ local function doMatchQuery()
         body is read (because the sink keeps looking for the pattern and doesn't find it), but in that case, request()
         returns the expected/documented "cond=1,httpStatus=200" response.
     ]]
-    debug("doMatchQuery(): returned from request(), cond=%1, httpStatus=%2, httpHeaders=%3", cond, httpStatus, httpHeaders)
+    D("doMatchQuery() returned from request(), cond=%1, httpStatus=%2, httpHeaders=%3", cond or "nil", httpStatus, httpHeaders)
+    if logRequest then
+        L("Response status %1 with matched %2", httpStatus, matched)
+    end
+
     if cond == nil or (cond == 1 and httpStatus == 200) then
-        if matched then     
+        if matched then
             setMessage("Valid response; matched!")
         else
             setMessage("Valid response; no match.")
@@ -239,12 +435,12 @@ local function doMatchQuery()
         end
     else
         setMessage("Invalid response (" .. tostring(httpStatus) .. ")")
+        luup.variable_set(MYSID, "LastMatchValue", "", luup.device)
         err = true
     end
 
-    debug("doMatchQuery(): seeking %1 in %2", pattern, url)
     -- Set trip state based on result.
-    debug("doMatchQuery(): matched is %1", matched)
+    D("doMatchQuery() matched is %1", matched)
     local tripState = isTripped()
     local newTrip
     if trigger == "neg" then
@@ -254,53 +450,54 @@ local function doMatchQuery()
     else
         newTrip = matched
     end
-    if newTrip and not tripState then
-        trip(true)
-    elseif tripState and not newTrip then
-        trip(false)
-    end
+    trip(newTrip)
 end
 
 local function doJSONQuery(url)
     local url = luup.variable_get(MYSID, "RequestURL", luup.device) or ""
     local timeout = getVarNumeric("Timeout", 60)
     local maxlength = getVarNumeric("MaxLength", 262144)
-
-    local http = require("socket.http")
     local body, httpStatus, httpHeaders
     local err = false
-    http.TIMEOUT = timeout
+    local texp = luup.variable_get(MYSID, "TripExpression", luup.device)
+    local ttype = luup.variable_get(MYSID, "Trigger", luup.device) or "err"
+    
     setMessage("Requesting JSON...")
-    body, httpStatus, httpHeaders = http.request(url)
-    debug("doJSONQuery(): request returned httpStatus=%1, body=%2", httpStatus, body)
-    if body == nil or httpStatus ~= 200 then
+    err,body,httpStatus = doRequest(url)
+    D("doJSONQuery() request returned httpStatus=%1, body=%2", httpStatus, body)
+    local ctx = { response={}, status={ timestamp=os.time(), valid=0, httpStatus=httpStatus } }
+    if body == nil or err then
         -- Error; trip sensor
-        if not isTripped() then
-            trip(true)
+        D("doJSONQuery() setting tripped and bugging out...")
+        fail(true)
+        if ttype == "err" then trip(true) end
+    else
+        D("doJSONQuery() fixing up JSON response for parsing")
+        setMessage("Parsing response...")
+        -- Fix booleans, which dkjson doesn't seem to understand (gives nil)
+        body = string.gsub( body, ": *true *,", ": 1," )
+        body = string.gsub( body, ": *false *,", ": 0," )
+
+        -- Process JSON response. First parse response.
+        local t, pos, err
+        t, pos, err = dkjson.decode(body)
+        if err then
+            L("Unable to decode JSON response, %2 (dev %1)", luup.device, err)
+            -- If TripExpression isn't used, trip follows status
+            fail(true)
+            if ttype == "err" then trip(true) end
+            -- Set state var for invalid response?
+            setMessage("Invalid response")
+            ctx.status.jsonStatus = err
+        else 
+            D("doJSONQuery() parsed response")
+            -- Encapsulate the response
+            ctx.status.valid = 1
+            ctx.status.jsonStatus = "OK"
+            ctx.response = t
+            fail(false)
         end
-        return
     end
-    
-    -- Process JSON response. First parse response.
-    local json = require("dkjson")
-    local t, pos, err
-    t, pos, err = json.decode(body)
-    if err then
-        luup.log("SiteSensor(" .. luup.device .. "): unable to decode JSON response, " .. err)
-        if not isTripped() then
-            trip(true)
-        end
-        setMessage("Invalid response")
-        return
-    end
-    
-    local ix,iv
-    local nn = 0
-    for ix,iv in pairs(t) do
-        debug("doJSONQuery(): data %1=%2", ix, tostring(iv))
-        nn = nn + 1
-    end
-    debug("doJSONQuery(): %1 root keys", nn)
 
 --[[ PHR??? IDEA: When we get to using luaxp, have TripCondition expression that trips if true, untrips if false.
                   This allows the JSON response to control the tripped state. Can luaxp return true/false bool?
@@ -309,56 +506,107 @@ local function doJSONQuery(url)
                   able to return tables as function value.
             IDEA: Have device status display show "Last Result:" label for message, and "Next Query" time/date.
 ]]
-                  
-    -- Since we got a valid response, indicate not tripped.
-    if isTripped() then
-        trip(false)
+
+
+    -- Since we got a valid response, indicate not tripped, unless using TripExpression, then that.
+    -- Reset state var for (in)valid response?
+    setMessage("Processing response...")
+    if ttype == "expr" then
+        D("doJSONQuery() parsing TripExpression %1", texp)
+        local r = nil
+        if texp ~= nil then r = parseRefExpr(texp, ctx) end
+        D("doJSONQuery() TripExpression result is %1", r)
+        if r == nil
+            or (type(r) == "boolean" and r == false)
+            or (type(r) == "number" and r == 0)
+            or (type(r) == "string" and string.len(r) == 0)
+        then
+            -- Trip expression is logically (for us) false
+            trip(false)
+        else    
+            -- Trip expression is not logically false (i.e. true)
+            trip(true)
+        end
+    else
+        -- No trip expression; trip state follows query success
+        D("doJSONQuery() resetting tripped state")
+        trip(ctx.status.valid == 0)
     end
-    
+
     -- Valid response. Let's parse it and set our variables.
     local i
-    for i =1,8,1 do
+    for i = 1,8 do
         local r = nil
         local ex = luup.variable_get(MYSID, "Expr" .. tostring(i), luup.device)
-        if ex ~= nil and #ex then
-            debug("doJSONQuery(): parsing %1 to value", ex)
-            r = parseRefExpr(ex, t)
-            debug("doJSONQuery(): parsed value of %1 is %2", ex, tostring(r))
+        D("doJSONQuery() Expr%1=%2", i, ex or "nil")
+        if ex ~= nil and string.len(ex) > 0 then
+            D("doJSONQuery() parsing %1 to value", ex)
+            r = parseRefExpr(ex, ctx)
+            D("doJSONQuery() parsed value of %1 is %2", ex, tostring(r))
+        else
+            luup.variable_set(MYSID, "Expr" .. tostring(i), "", luup.device)
         end
-        if r == nil then r = "" end
-        if r ~= luup.variable_get(MYSID, "Value" .. tostring(i), luup.device) then
+        
+        -- Canonify the result value
+        if r == nil then 
+            r = ""
+        elseif type(r) == "boolean" then
+            if r then r = "1" else r = "0" end
+        else
+            r = tostring(r)
+        end
+
+        -- Save if changed.
+        local oldVal = luup.variable_get(MYSID, "Value" .. tostring(i), luup.device)
+        D("doJSONQuery() newval=%1, oldVal=%2", r, oldVal)
+        if r ~= oldVal then
             -- Set new value only if changed
-            luup.variable_set(MYSID, "Value" .. tostring(i), r, luup.device)
+            D("doJSONQuery() Expr%1 value changed, was %2 now %3", i, oldVal, r)
+            luup.variable_set(MYSID, "Value" .. tostring(i), tostring(r), luup.device)
         end
     end
-    
-    setMessage("Valid response")
+
+    local msg
+    if ctx.status.valid == 0 then
+        msg = "Last query failed, "
+        if ctx.status.httpStatus ~= 200 then
+            msg = msg .. "HTTP status " .. tostring(ctx.status.httpStatus)
+        else
+            msg = msg .. "JSON error " .. ctx.status.jsonStatus
+        end
+    else
+        msg = "Last query succeeded!"
+    end
+    setMessage( msg )
 end
 
 function runQuery()
+    -- Save current time (before things start happening).
+    luup.variable_set(MYSID, "LastRun", os.time(), luup.device)
+
     -- We may only query when armed, so check that.
     local queryArmed = getVarNumeric("QueryArmed", 1)
     if queryArmed == 0 or isArmed() then
-        local type = luup.variable_get(MYSID, "Type", luup.device) or "pattern"
-        
+        local type = luup.variable_get(MYSID, "ResponseType", luup.device) or "text"
+
         -- What type of query?
-        if type == "pattern" then
-            doMatchQuery()
-        elseif type == "json" then
+        if type == "json" then
             doJSONQuery()
+        else
+            doMatchQuery()
         end
 
         -- Timestamp
         luup.variable_set(MYSID, "LastQuery", os.time(), luup.device)
+    else
+        setMessage("Disarmed; query skipped.")
     end
-        
-    -- Run next interval
-    luup.variable_set(MYSID, "LastRun", os.time(), luup.device)
+
     scheduleNext()
 end
 
 function arm(dev)
-    debug("arm(): arming!")
+    D("arm() arming!")
     luup.variable_set(SSSID, "Armed", "1", luup.device)
     if isTripped() then
         luup.variable_set(SSSID, "ArmedTripped", "1", luup.device)
@@ -366,7 +614,7 @@ function arm(dev)
 end
 
 function disarm(dev)
-    debug("disarm(): disarming!")
+    D("disarm() disarming!")
     luup.variable_set(SSSID, "Armed", "0", luup.device)
     luup.variable_set(SSSID, "ArmedTripped", "0", luup.device)
 end
@@ -374,7 +622,7 @@ end
 function init(dev)
     -- Make sure we're in the right environment
     if not checkVersion() then
-        luup.log("SiteSensor: This plugin is currently supported only in UI7; buh-bye!")
+        L("This plugin is currently supported only in UI7; buh-bye!")
         return false
     end
 
@@ -385,113 +633,3 @@ function init(dev)
     setMessage("")
     scheduleNext()
 end
-
---[[ Other stuff we don't need now...
-
-local function parseURL(url)
-    local t = {}
-    local s, e
-    -- http://xyzzy.example.com:8080/therestofit?abc&def
-    local s, e, p, q, r = string.find(url, "^([^:]+)://([^/]+)")
-    debug("parseURL(): url=%1, s=%2, e=%3, p=%4", url, s, e, p)
-    if s ~=nil and s > 0 then
-        t['proto'] = p
-        t['host'] = q
-        t['path'] = string.sub(url, e+1)
-        if t['path'] == "" then t['path'] = '/' end
-        s, e, p = string.find(t['host'], ":(%d+)$")
-        if (s ~= nil) then
-            t['host'] = string.sub(t['host'], 1, s-1)
-            t['port'] = p
-        else
-            t['port'] = nil
-        end
-        debug("parseURL(): url=%1, proto=%2, host=%3, port=%4, path=%5", url, t['proto'], t['host'], t['port'], t['path'])
-        return t
-    else
-        debug("parseURL(): failed to parse %1", url)
-        return false
-    end
-end
-
-function oldRunQuery()
-    local url = luup.variable_get(MYSID, "RequestURL", luup.device) or ""
-    local pattern = luup.variable_get(MYSID, "Pattern", luup.device) or "^HTTP/1.. 200"
-    local tripState = isTripped()
-    local timeout = 60
-    local matched = false
-    local valid = true
-    
-    -- Parse the URL to its components
-    local parts = parseURL(url)
-    if parts['proto'] == 'http' then
-        if parts['port'] == nil or #parts['port'] == 0 then parts['port'] = 80 end
-        if parts['path'] == nil or #parts['path'] == 0 then parts['path'] = "/" end
-    elseif parts['proto'] == 'telnet' then
-        if parts['port'] == nil or #parts['port'] == 0 then parts['port'] = 23 end
-        parts['proto'] = 'socket'
-    elseif parts['proto'] == 'socket' then
-        if parts['port'] == nil or #parts['port'] == 0 then valid = false end
-    else
-        valid = false
-    end
-    
-    -- If we have a valid request, make it
-    if valid then
-        -- Open socket
-        local maxBuf = 255
-        local h, buf
-        local exhausted = os.time() + timeout
-        buf = ""
-        io.open(h, parts['host'], parts['port'])
-        io.intercept(h)
-        if parts['proto'] == 'http' then
-            io.write("GET " .. parts['path'] .. " HTTP/1.0\r\nHost: " .. parts['host'] .. "\r\n\r\n")
-        end
-        -- Read and try to match reply to pattern
-        while os.time() < exhausted do
-            local b = io.read(1,h)
-            buf = buf .. b
-            debug("runQuery(): read %1, now have %2", b, buf)
-            
-            if string.find(buf, pattern) then
-                -- Match!
-                debug("runQuery(): that matches %1!", pattern)
-                matched = true
-                break
-            end
-            
-            -- Don't let the buffer string get too large
-            local l = string.len(buf)
-            if l > maxbuf then
-                buf = string.sub(buf, l-maxbuf+1)
-            end
-
-            luup.sleep(100) -- short rest
-        end
-    else
-        debug("runQuery(): parseURL() says %1 is invalid, nothing more I can do... buh-bye!", url)
-        luup.set_failure(1, luup.device)
-        -- N.B. exit without scheduling next interval
-        return 
-    end
-    
-    -- Set trip state based on result.
-    debug("runQuery(): matched is %1", matched)
-    if matched then
-        if not tripState then
-            trip(true)
-        end
-    else
-        -- No match, or no data at all
-        if tripState then
-            trip(false)
-        end
-    end
-    luup.variable_set(MYSID, "LastQuery", os.time(), luup.device)
-    
-    -- Run next interval
-    scheduleNext()
-end
-
-]]
