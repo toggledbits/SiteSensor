@@ -280,7 +280,7 @@ local function doRequest(url, method, body)
     else
         src = nil
     end
-    
+
     local moreHeaders = luup.variable_get(MYSID, "Headers", luup.device) or ""
     if string.len(moreHeaders) > 0 then
         local h,_ = split(moreHeaders, "|")
@@ -303,7 +303,7 @@ local function doRequest(url, method, body)
     local respBody, httpStatus, httpHeaders
     local r = {}
     http.TIMEOUT = timeout -- N.B. http not https, regardless
-    if logRequest then 
+    if logRequest then
         L("HTTP %2 %1, headers=%3", url, method, tHeaders)
     end
     respBody, httpStatus, httpHeaders = requestor.request{
@@ -318,7 +318,7 @@ local function doRequest(url, method, body)
 
     -- Since we're using the table sink, concatenate chunks to single string.
     respBody = table.concat(r)
-    
+
     if logRequest then
         L("Response status %1 with %2 in body", httpStatus, string.len(respBody))
     end
@@ -369,7 +369,7 @@ local function doMatchQuery( type, method )
 
     http.TIMEOUT = timeout
     setMessage("Requesting...")
-    if logRequest then 
+    if logRequest then
         L("HTTP %2 %1, headers=%3", url, method, tHeaders)
     end
     cond, httpStatus, httpHeaders = requestor.request {
@@ -463,7 +463,7 @@ local function doJSONQuery(url)
     local err = false
     local texp = luup.variable_get(MYSID, "TripExpression", luup.device)
     local ttype = luup.variable_get(MYSID, "Trigger", luup.device) or "err"
-    
+
     setMessage("Requesting JSON...")
     err,body,httpStatus = doRequest(url)
     D("doJSONQuery() request returned httpStatus=%1, body=%2", httpStatus, body)
@@ -491,7 +491,7 @@ local function doJSONQuery(url)
             -- Set state var for invalid response?
             setMessage("Invalid response")
             ctx.status.jsonStatus = err
-        else 
+        else
             D("doJSONQuery() parsed response")
             -- Encapsulate the response
             ctx.status.valid = 1
@@ -525,7 +525,7 @@ local function doJSONQuery(url)
         then
             -- Trip expression is logically (for us) false
             trip(false)
-        else    
+        else
             -- Trip expression is not logically false (i.e. true)
             trip(true)
         end
@@ -548,9 +548,9 @@ local function doJSONQuery(url)
         else
             luup.variable_set(MYSID, "Expr" .. tostring(i), "", luup.device)
         end
-        
+
         -- Canonify the result value
-        if r == nil then 
+        if r == nil then
             r = ""
         elseif type(r) == "boolean" then
             if r then r = "1" else r = "0" end

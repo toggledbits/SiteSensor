@@ -2,11 +2,11 @@
 
 ## Introduction ##
 
-SiteSensor is a plugin for Vera home automation controllers that periodically makes requests of a remote  
+SiteSensor is a plugin for Vera home automation controllers that periodically makes requests of a remote
 server. Based on the response, it sets its "tripped" state (acting as a SecuritySensor device), and can also store
 parsed values from JSON data. This makes it possible to use a remote RESTful API without writing a plugin.
 
-This has many uses. A trivial use may be to periodically make requests of a remote web site simply to determine 
+This has many uses. A trivial use may be to periodically make requests of a remote web site simply to determine
 if your home internet connection is operating properly. An only slightly-less trivial use would be to probe a
 remote site to determine that *it* is operating correctly (a poor man's up/down monitor). More complex, but
 perhaps still fun, is that you can have SiteSensor query the Twitter API and trigger a scene in your home to
@@ -15,7 +15,7 @@ flash a light when someone mentions you in a tweet that contains the hashtag *#h
 Currently, only HTTP/HTTPS GET queries are supported, but future plans include support for additional HTTP methods
 (POST, PUT, etc.), and direct TCP socket connections.
 
-SiteSensor is written and supported by Patrick Rigney, aka rigpapa on the [Vera forums](http://http://forum.micasaverde.com/). 
+SiteSensor is written and supported by Patrick Rigney, aka rigpapa on the [Vera forums](http://http://forum.micasaverde.com/).
 For more information, see <http://www.toggledbits.com/>.
 
 ## Installation ##
@@ -23,7 +23,7 @@ For more information, see <http://www.toggledbits.com/>.
 The plugin is currently in beta test, so it cannot be installed from the Vera plugin store.
 
 To install the plugin, download a release ZIP package from this site, and use the "Apps > Develop Apps > Luup Files"
-page in the Vera console to upload the plugin files individually (not the ZIP file itself). 
+page in the Vera console to upload the plugin files individually (not the ZIP file itself).
 Then create a device (Apps > Develop Apps > Create Device) with the following attributes (copy/paste recommended):
 
 * Device Type: `urn:schemas-toggledbits-com:device:SiteSensor:1`
@@ -45,8 +45,8 @@ add headers (e.g. Bearer, for authentication) currently, but this is planned.
 ### Request Headers ###
 
 If the site you are probing requires some kind of additional header(s) (for example, for authentication), you can
-supply those headers in this field. They must be formatted in the usual HTTP syntax: `Header: Value`. If you have 
-multiple, list them one per line. Note that any automatic wrapping of lines longer than the field width 
+supply those headers in this field. They must be formatted in the usual HTTP syntax: `Header: Value`. If you have
+multiple, list them one per line. Note that any automatic wrapping of lines longer than the field width
 does not cause a newline to be inserted into the header.
 
 ### Request Interval ###
@@ -57,7 +57,7 @@ as possible. Any interruption of service to the Vera or SiteSensor (e.g. reboot,
 the timing of queries, unless it is longer than the request interval. For example, let's say we're set up for the
 default 1800 second (30 minute) interval, and SiteSensor makes a query at 8:02am, but the power then fails at 8:15am.
 As long as power is restored and the Vera rebooted by 8:32am, the query will happen then. If the event delays the
-request past 8:32am, then as soon as SiteSensor restarts it will make a query, and further queries will continue 
+request past 8:32am, then as soon as SiteSensor restarts it will make a query, and further queries will continue
 on 30 minute intervals from then.
 
 ### Query Only When Armed ###
@@ -79,7 +79,7 @@ on handling JSON responses, see the Advanced Configuration section.
 
 ### Trigger Type ###
 
-SiteSensor operates as a SecuritySensor class device, so it has a "triggered" property, just as an alarm sensor in that class, 
+SiteSensor operates as a SecuritySensor class device, so it has a "triggered" property, just as an alarm sensor in that class,
 like a motion detector, would.
 Setting the trigger type determines how SiteSensor will control its "triggered" status.
 
@@ -88,7 +88,7 @@ response from the server causes the SiteSensor device to enter triggered state. 
 state. This trigger type is available with any response type.
 
 There are two pattern match states, one for positive match, and one for negative match. These cause SiteSensor to look for
-a string in the returned result text, and are therefore only available when the response type is text. For a positive match, 
+a string in the returned result text, and are therefore only available when the response type is text. For a positive match,
 the SiteSensor device will enter triggered state if the pattern string is found in the response text. For a negative match, the
 device is only triggered if the pattern is *not* found in the response text.
 
@@ -124,49 +124,49 @@ The following conditions apply:
 #### Expressions ####
 
 SiteSensor will evaluate up to 8 expressions and store the results. The results are stored in variables named `Value1`,
-`Value2`, ..., `Value8`.  These variables send events when their value changes, so you can use them as triggers for 
+`Value2`, ..., `Value8`.  These variables send events when their value changes, so you can use them as triggers for
 scenes and Lua.
 
-Expressions work pretty much as expected, with standard operator precedence, grouping (and nesting) with parentheses, 
+Expressions work pretty much as expected, with standard operator precedence, grouping (and nesting) with parentheses,
 and a small library of helpful functions. The syntax is similar to that of Lua.
 
 Expressions use dot notation to navigate the tree of values in the decoded JSON response. Let's consider this JSON response. We'll use it for all of the examples in this section:
 
 ```
-{  
+{
    "status":"OK",
    "timestamp":"1484492903",
-   "temperature":{  
+   "temperature":{
       "degrees":"72",
       "unit":"fahrenheit"
    },
-   "listitems":[  
+   "listitems":[
       "1",
       "32",
       "1882",
       "128331"
    ],
-   "alerts":[  
-      {  
+   "alerts":[
+      {
          "id":"NOACT",
          "text":"No account available",
          "code":"1033"
       },
-      {  
+      {
          "id":"177",
          "text":"Door prop alarm",
          "code":"4100",
          "since":"1484492903",
          "zone":"5"
       },
-      {  
+      {
          "id":"177",
          "text":"Door prop alarm",
          "code":"4100",
          "since":"1484493071",
          "zone":"13"
       },
-      {  
+      {
          "id":"200",
          "text":"Invalid card at reader",
          "code":"7000",
@@ -200,8 +200,8 @@ String functions: len(s), find(s, p [,i]), sub(s, n [,l]), upper(s), lower(s), t
 
 Other functions: time(), strftime( fmt [,t] ), choose( n, d, v1, v2, ...), select( obj, key, val )
 
-Array elements can be accessed using square brackets and the desired element number. The value of the third element in `response.listitems` 
-in our example would therefore be returned using the expression `response.listitems[3]`. Array subscripts can also be strings, and in this 
+Array elements can be accessed using square brackets and the desired element number. The value of the third element in `response.listitems`
+in our example would therefore be returned using the expression `response.listitems[3]`. Array subscripts can also be strings, and in this
 usage, `response.temperature.degrees` and `response['temperature']['degrees']` are synonymous (the dot-notation is a shortcut).
 
 The "alerts" array is an interesting case--it's an array of objects. Let's say we needed to find the array element with id equal to 200. We can see it's
@@ -234,7 +234,7 @@ trigger--it's just an example).
 <dl>
     <dt>Can SiteSensor handle XML responses like it does JSON?</dt>
     <dd>That is planned, but not yet available.</dd>
-</dl>        
+</dl>
 
 ## Reporting Bugs/Enhancement Requests ##
 

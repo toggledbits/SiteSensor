@@ -8,7 +8,7 @@ var SiteSensor = (function(api) {
     var myModule = {};
 
     var myDevice = api.getCpanelDeviceId();
-    
+
     function updateResponseFields() {
         var rtype = jQuery('select#rtype').val();
         jQuery('select#trigger option[value="match"]').attr('disabled', rtype != "text");
@@ -21,7 +21,7 @@ var SiteSensor = (function(api) {
             ttype = jQuery('select#trigger option:enabled').first().val();
             jQuery('select#trigger').val(ttype); // causes loop/recursion?
         }
-        
+
         jQuery('input#pattern').attr('disabled', ttype != "match" && ttype != "neg");
         jQuery('input#tripexpression').attr('disabled', ttype != "expr");
 
@@ -43,17 +43,17 @@ var SiteSensor = (function(api) {
             initPlugin();
 
             var i, j, roomObj, roomid, html = "";
-            
+
             html += "<style>";
             html += ".tb-cgroup { padding: 0px 32px 0px 0px }"
             html += "</style>";
-            
+
             // Request URL
             html += "<div class=\"tb-cgroup pull-left\">";
             html += "<h2>Request URL</h2><label for=\"requestURL\">Enter the URL to be queried:</label><br/>";
             html += "<textarea type=\"text\" rows=\"3\" cols=\"64\" wrap=\"soft\" id=\"requestURL\" />";
             html += "</div>";
-            
+
             // Request Headers
             html += "<div class=\"tb-cgroup pull-left\">";
             html += "<h2>Request Headers</h2><label for=\"requestHeaders\">Enter request headers, one per line:</label><br/>";
@@ -61,7 +61,7 @@ var SiteSensor = (function(api) {
             html += "</div>";
 
             html += "<div class=\"clearfix\"></div>";
-            
+
             // Request interval
             html += "<div class=\"tb-cgroup pull-left\">";
             html += "<h2>Request Interval</h2><label for=\"timeout\">Enter the number of seconds between requests:</label><br/>";
@@ -75,7 +75,7 @@ var SiteSensor = (function(api) {
             html += "</div>";
 
             html += "<div class=\"clearfix\"></div>";
-            
+
             // Response Type
             html += "<div class=\"tb-cgroup pull-left\">";
             html += "<h2>Response Type</h2><label for=\"rtype\">Server response is handled as:</label><br/>";
@@ -83,7 +83,7 @@ var SiteSensor = (function(api) {
             html += '<option value="json">JSON data</option>';
             html += '</select>';
             html += "</div>";
-            
+
             // Trigger
             html += "<div class=\"tb-cgroup pull-left\">";
             html += "<h2>Trigger Type</h2><label for=\"trigger\">Sensor is triggered when:</label><br/>";
@@ -95,7 +95,7 @@ var SiteSensor = (function(api) {
             html += "</div>";
 
             html += "<div class=\"clearfix\"></div>";
-            
+
             // Response pattern
             html += '<div class="tb-textcontrols">';
             html += "<h2>Response Pattern</h2><label for=\"pattern\">Enter the pattern to match in the response (note: not a regexp):</label><br/>";
@@ -106,7 +106,7 @@ var SiteSensor = (function(api) {
             html += '<div class="tb-jsoncontrols">';
             html += "<h2>Trip Expression</h2><label for=\"tripexpression\">If the Trigger Type (above) is 'result of an expression', enter the expression below (true result=triggered):</label><br/>";
             html += "<input type=\"text\" size=\"64\" id=\"tripexpression\" />";
-            
+
             // Expressions for drawing out field values
             html += "<h2>Value Expressions</h2>";
             html += "<p>Use these expressions to draw values from the response JSON data and store them in state variables. You can use these values as triggers for scenes and Lua scripts.</p>";
@@ -115,17 +115,17 @@ var SiteSensor = (function(api) {
                 html += '<li><input class="jsonexpr" id="expr' + ix + '" size="64" type="text"></li>';
             }
             html += "</ol>";
-            
+
             html += '<p>The JSON data is encapsulated within a "response" key, so if your JSON data looks like the example below, the value <i>errCode</i> would be accessed by the expression <tt>response.errCode</tt>, while the value <i>name</i> would be accessed using <tt>response.type.name</tt>. Refer to the <a href="#">documentation</a> for more details.</p>';
             html += "<code>{\n    \"errCode\": 0,\n    \"type\": {\n        \"name\": \"Normal\",\n        \"class\": \"apiobject\"\n    }\n}</code>";
-            
+
             html += "</div>"; // tb-jsoncontrols
-            
+
             html += "<br/><hr>";
-            
+
             // Push generated HTML to page
             api.setCpanelContent(html);
-          
+
             // Restore values
             var s;
             s = api.getDeviceState(myDevice, serviceId, "RequestURL");
@@ -133,7 +133,7 @@ var SiteSensor = (function(api) {
                 var newUrl = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "RequestURL", newUrl, 0);
             });
-            
+
             s = api.getDeviceState(myDevice, serviceId, "Headers");
             if (s) {
                 // decode
@@ -148,7 +148,7 @@ var SiteSensor = (function(api) {
                 newText = newText.replace(/\s*(\r|\n|\r\n)/g, "|"); /* Convert newlines to our list breaks */
                 api.setDeviceStatePersistent(myDevice, serviceId, "Headers", newText, 0);
             });
-            
+
             s = parseInt(api.getDeviceState(myDevice, serviceId, "Interval"));
             if (isNaN(s))
                 s = 1800;
@@ -157,7 +157,7 @@ var SiteSensor = (function(api) {
                 if (newInterval.match(/^[0-9]+$/) && newInterval >= 60)
                     api.setDeviceStatePersistent(myDevice, serviceId, "Interval", newInterval, 0);
             });
-            
+
             s = parseInt(api.getDeviceState(myDevice, serviceId, "QueryArmed"));
             if (isNaN(s))
                 s = 1;
@@ -166,7 +166,7 @@ var SiteSensor = (function(api) {
                 var newState = jQuery(this).prop("checked");
                 api.setDeviceStatePersistent(myDevice, serviceId, "QueryArmed", newState ? "1" : "0", 0);
             });
-            
+
             s = parseInt(api.getDeviceState(myDevice, serviceId, "Timeout"));
             if (isNaN(s))
                 s = 60;
@@ -176,7 +176,7 @@ var SiteSensor = (function(api) {
                     api.setDeviceStatePersistent(myDevice, serviceId, "Timeout", newVal, 0);
                 }
             });
-            
+
             s = api.getDeviceState(myDevice, serviceId, "ResponseType");
             if (s) jQuery('select#rtype option[value="' + s + '"]').prop('selected', true);
             jQuery('select#rtype').change( function( obj ) {
@@ -184,7 +184,7 @@ var SiteSensor = (function(api) {
                 api.setDeviceStatePersistent(myDevice, serviceId, "ResponseType", newType, 0);
                 updateResponseFields();
             });
-            
+
             s = api.getDeviceState(myDevice, serviceId, "Trigger");
             if (s) jQuery('select#trigger option[value="' + s + '"]').prop('selected', true);
             jQuery('select#trigger').change( function( obj ) {
@@ -198,13 +198,13 @@ var SiteSensor = (function(api) {
                 var newPat = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "Pattern", newPat, 0);
             });
-            
+
             s = api.getDeviceState(myDevice, serviceId, "TripExpression");
             if (s) jQuery("input#tripexpression").val(s).change( function( obj ) {
                 var newExpr = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "TripExpression", newExpr, 0);
             });
-            
+
             $('input.jsonexpr').each( function( obj ) {
                 var ix = $(this).attr('id').substr(4);
                 var s = api.getDeviceState(myDevice, serviceId, "Expr" + ix);
@@ -215,7 +215,7 @@ var SiteSensor = (function(api) {
                 var ix = $(this).attr('id').substr(4);
                 api.setDeviceStatePersistent(myDevice, serviceId, "Expr" + ix, newExpr, 0);
             });
-            
+
             updateResponseFields();
         }
         catch (e)

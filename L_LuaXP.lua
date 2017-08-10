@@ -21,7 +21,7 @@ local BINOP = 'binop'
 _VERSION = "0.9.3+SiteSensor"
 _DEBUG = false
 
-local binops = { 
+local binops = {
       { op='.', prec=-1 }
     , { op='*', prec=3 }
     , { op='/', prec=3 }
@@ -114,7 +114,7 @@ end
 function dump(t)
     local typ = base.type(t)
     st = "(" .. typ .. ")"
-    if (typ == "table") then 
+    if (typ == "table") then
         st = st .. "{ "
         local n,v
         local first = true
@@ -147,7 +147,7 @@ end
 
 -- Scan a numeric token. Supports fractional and exponent specs in
 -- decimal numbers, and binary, octal, and hexadecimal integers.
-local function scan_numeric( expr, index ) 
+local function scan_numeric( expr, index )
     debug("scan_numeric from " .. index .. " in " .. expr)
     local len = string.len(expr)
     local start = index
@@ -160,7 +160,7 @@ local function scan_numeric( expr, index )
         -- Look to next character
         index = index + 1
         ch = string.sub(expr, index, index)
-        if (ch == 'b' or ch == 'B') then 
+        if (ch == 'b' or ch == 'B') then
             base = 2
             index = index + 1
         elseif (ch == 'x' or ch == 'X') then
@@ -184,7 +184,7 @@ local function scan_numeric( expr, index )
         index = index + 1
     end
     -- Parse fractional part, if any
-    if (ch == '.' and base==10) then 
+    if (ch == '.' and base==10) then
         local ndec = 0
         index = index + 1 -- get past decimal point
         while (index <= len) do
@@ -200,7 +200,7 @@ local function scan_numeric( expr, index )
     if ( (ch == 'e' or ch == 'E') and base == 10 ) then
         local npow = 0
         index = index + 1 -- get base exponent marker
-        while (index <= len) do 
+        while (index <= len) do
             ch = string.sub(expr, index, index)
             i = string.find("0123456789", ch, 1, true)
             if (i == nil) then break end
@@ -239,9 +239,9 @@ local function scan_string( expr, index )
     return error("Unterminated string at " .. index, 0)
 end
 
--- Parse a function reference. It is treated as a degenerate case of 
+-- Parse a function reference. It is treated as a degenerate case of
 -- variable reference, i.e. an alphanumeric string followed immediately
--- by an opening parenthesis.   
+-- by an opening parenthesis.
 local function scan_fref( expr, index, name )
     debug("scan_fref from " .. index .. " in " .. expr)
     local len = string.len(expr)
@@ -251,7 +251,7 @@ local function scan_fref( expr, index, name )
     local subexp = ""
     while ( true ) do
         if ( index > len ) then return error("Unexpected end of argument list at " .. index, 0) end -- unexpected end of argument list
-        
+
         ch = string.sub(expr, index, index)
         if (ch == ')') then
             debug("scan_fref: Found a closing paren while at level " .. parenLevel)
@@ -271,7 +271,7 @@ local function scan_fref( expr, index, name )
             end
         elseif (ch == ',' and parenLevel == 1) then -- completed subexpression
             debug("scan_fref: handling argument=" .. subexp)
-            if (string.len(subexp) > 0) then 
+            if (string.len(subexp) > 0) then
                 local r = _comp(subexp)
                 if (r == nil) then return error("Subexpression failed to compile at " .. index, 0) end
                 table.insert(args, r)
@@ -298,7 +298,7 @@ local function scan_aref( expr, index, name )
     local subexp = ""
     while ( true ) do
         if ( index > len ) then return error("Unexpected end of array index expression at " .. index, 0) end -- unexpected end of argument list
-        
+
         ch = string.sub(expr, index, index)
         if (ch == ']') then
             debug("scan_aref: Found a closing bracket, subexp=" .. subexp)
@@ -326,16 +326,16 @@ local function scan_vref( expr, index )
             return scan_aref(expr, index+1, name)
         end
         k = string.find("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_", string.upper(ch), 1, true)
-        if (k == nil) then 
-            break 
-        elseif (name == "" and k <= 10) then 
+        if (k == nil) then
+            break
+        elseif (name == "" and k <= 10) then
             return error("Invalid identifier at " .. index, 0) -- Invalid identifier (can't start with digit)
         end
-        
+
         name = name .. ch
         index = index + 1
     end
-    
+
     return index, { type=VREF, name=name, pos=index }
 end
 
@@ -412,7 +412,7 @@ local function scan_binop( expr, index )
             if (k == 1) then return error("Invalid operator at " .. st, 0) end
             break
         end
-        
+
         -- Keep going to find longest matching binop
         op = st
         index = index + 1
@@ -428,7 +428,7 @@ function scan_token( expr, index )
     local len = string.len(expr)
     local index = skip_white(expr, index)
     if (index > len) then return index, nil end
-    
+
     local ch = string.sub(expr,index,index)
     debug("scan_token guessing from " .. ch .. " at " .. index)
     if (ch == '"' or ch=="'") then
@@ -441,16 +441,16 @@ function scan_token( expr, index )
         -- Numeric token
         return scan_numeric( expr, index )
     end
-    
+
     -- Check for unary operator
     local k, r
     k, r = scan_unop( expr, index )
     if (r ~= nil) then return k, r end
-    
+
     -- Variable or function reference?
     k, r = scan_vref( expr, index )
     if (r ~= nil) then return k, r end
-    
+
     --We've got no idea what we're looking at...
     return error("Invalid token at " .. string.sub(expr,index), 0)
 end
@@ -493,11 +493,11 @@ end
 function _comp( expr )
     local index = 1
     local lhs
-    
+
     expr = expr or ""
     expr = tostring(expr)
     debug("_comp: parse " .. expr)
-    
+
     index,lhs = scan_token( expr, index )
     index,lhs = parse_rpn( lhs, expr, index, MAXPREC )
     return { lhs }
@@ -553,8 +553,8 @@ local function coerce(val, typ)
     if vt == typ then return val end
     if typ == "boolean" then
         -- Coerce to boolean
-        if vt == "number" then return val ~= 0 
-        elseif vt == "string" then 
+        if vt == "number" then return val ~= 0
+        elseif vt == "string" then
             if string.lower(val) == "true" then return true
             elseif string.lower(val) == "false" then return false
             else return #val ~= 0 -- empty string is false, all else is true
@@ -651,7 +651,7 @@ local function _run( ce, ctx, stack )
                     check_operand_type(v2, "number")
                     v = bit.bor(v1, v2)
                 end
-            elseif (e.op == '^') then 
+            elseif (e.op == '^') then
                 if base.type(v1) == "boolean" or base.type(v2) == "boolean" then
                     v = coerce(v1, "boolean") or coerce(v2, "boolean")
                 else
@@ -709,7 +709,7 @@ local function _run( ce, ctx, stack )
                 v = v * -1
             elseif (e.op == '+') then
                 -- noop
-            elseif (e.op == '!') then 
+            elseif (e.op == '!') then
                 if base.type(v) == "boolean" then
                     v = not v
                 else
@@ -781,7 +781,7 @@ local function _run( ce, ctx, stack )
                     if v == nil then error("Subreference doesn't exist", 0) end
                     index = index + 1 -- skip lookahead
                 end
-            end 
+            end
             if not isLook then
                 -- v = resolve(e.name, ctx)
                 v = ctx[e.name]
@@ -833,7 +833,7 @@ function run( compiledExpression, executionContext )
     executionContext = executionContext or {}
     if (compiledExpression == nil or compiledExpression.rpn == nil or base.type(compiledExpression.rpn) ~= "table") then return nil end
     local status, val = pcall(_run, compiledExpression.rpn, executionContext)
-    if (status) then 
+    if (status) then
         return val
     else
         return nil, val
