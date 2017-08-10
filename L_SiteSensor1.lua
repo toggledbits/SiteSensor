@@ -153,8 +153,9 @@ local function getVarNumeric( name, dflt, dev, serviceId )
     return s
 end
 
-local function setMessage(s)
-    luup.variable_set(MYSID, "Message", s or "", luup.device)
+local function setMessage(s, dev)
+    if dev == nil then dev = luup.device end
+    luup.variable_set(MYSID, "Message", s or "", dev)
 end
 
 local function isFailed()
@@ -206,44 +207,46 @@ local function trip(tripped)
     end
 end
 
-local function runOnce()
+local function runOnce(dev)
+    if dev == nil then dev = luup.device end
     local rev = getVarNumeric("Version", 0)
     if (rev == 0) then
         -- Initialize for new installation
         D("runOnce() Performing first-time initialization!")
-        luup.variable_set(MYSID, "Message", "", luup.device)
-        luup.variable_set(MYSID, "RequestURL", "", luup.device)
-        luup.variable_set(MYSID, "Interval", "1800", luup.device)
-        luup.variable_set(MYSID, "Timeout", "50", luup.device)
-        luup.variable_set(MYSID, "QueryArmed", "1", luup.device)
-        luup.variable_set(MYSID, "ResponseType", "text", luup.device)
-        luup.variable_set(MYSID, "Trigger", "err", luup.device)
-        luup.variable_set(MYSID, "Failed", "1", luup.device)
-        luup.variable_set(MYSID, "LastQuery", "0", luup.device)
-        luup.variable_set(MYSID, "LastRun", "0", luup.device)
-        luup.variable_set(MYSID, "LogRequests", "0", luup.device)
-        luup.variable_set(SSSID, "LastTrip", "0", luup.device)
-        luup.variable_set(SSSID, "Armed", "0", luup.device)
-        luup.variable_set(SSSID, "Tripped", "0", luup.device)
-        luup.variable_set(SSSID, "ArmedTripped", "0", luup.device)
+        luup.variable_set(MYSID, "Message", "", dev)
+        luup.variable_set(MYSID, "RequestURL", "", dev)
+        luup.variable_set(MYSID, "Interval", "1800", dev)
+        luup.variable_set(MYSID, "Timeout", "50", dev)
+        luup.variable_set(MYSID, "QueryArmed", "1", dev)
+        luup.variable_set(MYSID, "ResponseType", "text", dev)
+        luup.variable_set(MYSID, "Trigger", "err", dev)
+        luup.variable_set(MYSID, "Failed", "1", dev)
+        luup.variable_set(MYSID, "LastQuery", "0", dev)
+        luup.variable_set(MYSID, "LastRun", "0", dev)
+        luup.variable_set(MYSID, "LogRequests", "0", dev)
+        luup.variable_set(SSSID, "LastTrip", "0", dev)
+        luup.variable_set(SSSID, "Armed", "0", dev)
+        luup.variable_set(SSSID, "Tripped", "0", dev)
+        luup.variable_set(SSSID, "ArmedTripped", "0", dev)
     end
 
     -- No matter what happens above, if our versions don't match, force that here/now.
     if (rev ~= _CONFIGVERSION) then
-        luup.variable_set(MYSID, "Version", _CONFIGVERSION, luup.device)
+        luup.variable_set(MYSID, "Version", _CONFIGVERSION, dev)
     end
 end
 
-function scheduleNext()
+function scheduleNext(dev)
+    if dev == nil then dev = luup.device end
     -- First, get and sanitize our interval
-    local delay = getVarNumeric("Interval", 1800)
+    local delay = getVarNumeric("Interval", 1800, dev)
     if isArmed() then
-        delay = getVarNumeric("ArmedInterval", delay)
+        delay = getVarNumeric("ArmedInterval", delay, dev)
     end
     if delay < 1 then delay = 60 end
     D("scheduleNext() interval is %1", delay)
     -- Now, see if we've missed an interval
-    local nextQuery = getVarNumeric("LastRun", 0) + delay
+    local nextQuery = getVarNumeric("LastRun", 0, dev) + delay
     local now = os.time()
     local nextDelay = nextQuery - now
     if nextDelay <= 0 then
@@ -609,29 +612,29 @@ end
 
 function arm(dev)
     D("arm() arming!")
-    luup.variable_set(SSSID, "Armed", "1", luup.device)
+    luup.variable_set(SSSID, "Armed", "1", dev)
     if isTripped() then
-        luup.variable_set(SSSID, "ArmedTripped", "1", luup.device)
+        luup.variable_set(SSSID, "ArmedTripped", "1", dev)
     end
 end
 
 function disarm(dev)
     D("disarm() disarming!")
-    luup.variable_set(SSSID, "Armed", "0", luup.device)
-    luup.variable_set(SSSID, "ArmedTripped", "0", luup.device)
+    luup.variable_set(SSSID, "Armed", "0", dev)
+    luup.variable_set(SSSID, "ArmedTripped", "0", dev)
 end
 
 function init(dev)
     -- Make sure we're in the right environment
     if not checkVersion() then
+        setMessage("Unsupported firmware", dev)
         L("This plugin is currently supported only in UI7; buh-bye!")
         return false
     end
 
     -- See if we need any one-time inits
-    runOnce()
+    runOnce(dev)
 
     -- Schedule next query
-    setMessage("")
-    scheduleNext()
+    scheduleNext(dev)
 end
