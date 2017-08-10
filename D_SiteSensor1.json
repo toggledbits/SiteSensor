@@ -372,7 +372,7 @@
                     },
                     "Label": {
                         "lang_tag": "tb_sitesensor_about",
-                        "text": "SiteSensor ver 1.0.1 2017-08-09<br/>For documentation or to report bugs, please go to the <a target='_blank' href='https://github.com/toggledbits/sitesensor'>SiteSensor Github repository</a>.<br/>This plugin is offered for use as-is and without warranties of any kind. By using this plugin,<br/>you agree to assume all risks in connection with its use without limitation."
+                        "text": "SiteSensor ver 1.2 2017-09-15<br/>For documentation or to report bugs, please go to the <a target='_blank' href='https://github.com/toggledbits/sitesensor'>SiteSensor Github repository</a>.<br/>This plugin is offered for use as-is and without warranties of any kind. By using this plugin,<br/>you agree to assume all risks in connection with its use without limitation."
                     }
                 }
             ]
