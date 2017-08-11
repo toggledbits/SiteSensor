@@ -200,7 +200,8 @@ var SiteSensor = (function(api) {
             });
 
             s = api.getDeviceState(myDevice, serviceId, "TripExpression");
-            if (s) jQuery("input#tripexpression").val(s).change( function( obj ) {
+            if (s) jQuery("input#tripexpression").val(s);
+            jQuery("input#tripexpression").change( function( obj ) {
                 var newExpr = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "TripExpression", newExpr, 0);
             });
