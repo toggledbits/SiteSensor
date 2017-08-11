@@ -194,14 +194,13 @@ var SiteSensor = (function(api) {
             });
 
             s = api.getDeviceState(myDevice, serviceId, "Pattern");
-            if (s) jQuery("input#pattern").val(s).change( function( obj ) {
+            jQuery("input#pattern").val(s ? s : "").change( function( obj ) {
                 var newPat = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "Pattern", newPat, 0);
             });
 
             s = api.getDeviceState(myDevice, serviceId, "TripExpression");
-            if (s) jQuery("input#tripexpression").val(s);
-            jQuery("input#tripexpression").change( function( obj ) {
+            jQuery("input#tripexpression").val(s ? s : "").change( function( obj ) {
                 var newExpr = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "TripExpression", newExpr, 0);
             });
