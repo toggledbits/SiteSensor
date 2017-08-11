@@ -17,6 +17,7 @@ local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local SSSID = "urn:micasaverde-com:serviceId:SecuritySensor1"
 local HASID = "urn:micasaverde-com:serviceId:HaDevice1"
 
+local runStamp  = 0
 local debugMode = false
 local traceMode = false
 
@@ -158,51 +159,55 @@ local function setMessage(s, dev)
     luup.variable_set(MYSID, "Message", s or "", dev)
 end
 
-local function isFailed()
-    local failed = getVarNumeric("Failed", 0, luup.device, MYSID)
+local function isFailed(dev)
+    if dev == nil then dev = luup.device end
+    local failed = getVarNumeric("Failed", 0, dev, MYSID)
     return failed ~= 0
 end
 
-local function fail(failState)
+local function fail(failState, dev)
     assert(type(failState) == "boolean")
-    D("fail(%1)", failState)
+    if dev == nil then dev = luup.device end
+    D("fail(%1, %2)", failState, dev)
     if failState ~= isFailed() then
         local fval = 0
         if failState then fval = 1 end
-        luup.variable_set(MYSID, "Failed", fval, luup.device)
+        luup.variable_set(MYSID, "Failed", fval, dev)
     end
 end
 
-local function isArmed()
-    local armed = getVarNumeric("Armed", 0, luup.device, SSSID)
+local function isArmed(dev)
+    if dev == nil then dev = luup.device end
+    local armed = getVarNumeric("Armed", 0, dev, SSSID)
     return armed ~= 0
 end
 
-local function isTripped()
+local function isTripped(dev)
     local tripped = getVarNumeric("Tripped", 0, luup.device, SSSID)
     return tripped ~= 0
 end
 
-local function trip(tripped)
+local function trip(tripped, dev)
     assert(type(tripped) == "boolean")
-    D("trip(%1)", tripped)
+    if dev == nil then dev = luup.device end
+    D("trip(%1, %2)", tripped, dev)
     local newVal
     if tripped ~= isTripped() then
         if tripped then
             D("trip() marking tripped")
             newVal = "1"
-            luup.variable_set(SSSID, "LastTrip", os.time(), luup.device)
+            luup.variable_set(SSSID, "LastTrip", os.time(), dev)
         else
             D("trip() marking not tripped")
             newVal = "0"
         end
-        luup.variable_set(SSSID, "Tripped", newVal, luup.device)
+        luup.variable_set(SSSID, "Tripped", newVal, dev)
         if isArmed() then
             D("trip() marked armed-tripped")
-            luup.variable_set(SSSID, "ArmedTripped", newVal, luup.device)
+            luup.variable_set(SSSID, "ArmedTripped", newVal, dev)
         else
             D("trip() not armed-tripped")
-            luup.variable_set(SSSID, "ArmedTripped", "0", luup.device)
+            luup.variable_set(SSSID, "ArmedTripped", "0", dev)
         end
     end
 end
@@ -236,7 +241,7 @@ local function runOnce(dev)
     end
 end
 
-function scheduleNext(dev)
+function scheduleNext(stepStamp, dev)
     if dev == nil then dev = luup.device end
     -- First, get and sanitize our interval
     local delay = getVarNumeric("Interval", 1800, dev)
@@ -257,7 +262,7 @@ function scheduleNext(dev)
         D("scheduleNext() next coming a little sooner, reducing delay from %1 to %2", delay, nextDelay)
         delay = nextDelay
     end
-    luup.call_delay("siteSensorRunQuery", delay)
+    luup.call_delay("siteSensorRunQuery", delay, stepStamp)
     L("next query in %1", delay)
 end
 
@@ -323,7 +328,7 @@ local function doRequest(url, method, body)
     respBody = table.concat(r)
 
     if logRequest then
-        L("Response status %1 with %2 in body", httpStatus, string.len(respBody))
+        L("Response status %1, body %2", httpStatus, respBody)
     end
 
     -- See what happened. Anything 2xx we reduce to 200 (OK).
@@ -585,14 +590,25 @@ local function doJSONQuery(url)
     setMessage( msg )
 end
 
-function runQuery()
+function runQuery(stepStamp)
+    stepStamp = tonumber(stepStamp, 10)
+    if stepStamp ~= runStamp then
+        D("runQuery() stamp mismatch, got %1 expected %2, another thread running? Exiting!")
+        return
+    end
+    
+    local timeNow = os.time()
+    
     -- Save current time (before things start happening).
-    luup.variable_set(MYSID, "LastRun", os.time(), luup.device)
+    luup.variable_set(MYSID, "LastRun", timeNow, luup.device)
 
     -- We may only query when armed, so check that.
     local queryArmed = getVarNumeric("QueryArmed", 1)
     if queryArmed == 0 or isArmed() then
         local type = luup.variable_get(MYSID, "ResponseType", luup.device) or "text"
+
+        -- Timestamp
+        luup.variable_set(MYSID, "LastQuery", timeNow, luup.device)
 
         -- What type of query?
         if type == "json" then
@@ -600,27 +616,34 @@ function runQuery()
         else
             doMatchQuery()
         end
-
-        -- Timestamp
-        luup.variable_set(MYSID, "LastQuery", os.time(), luup.device)
     else
         setMessage("Disarmed; query skipped.")
     end
 
-    scheduleNext()
+    scheduleNext(stepStamp)
+end
+
+function forceUpdate(dev)
+    runStamp = os.time()
+    luup.call_delay("siteSensorRunQuery", 1, runStamp)
 end
 
 function arm(dev)
     D("arm() arming!")
-    luup.variable_set(SSSID, "Armed", "1", dev)
-    if isTripped() then
-        luup.variable_set(SSSID, "ArmedTripped", "1", dev)
+    if not isArmed(dev) then
+        luup.variable_set(SSSID, "Armed", "1", dev)
+        if isTripped() then
+            luup.variable_set(SSSID, "ArmedTripped", "1", dev)
+        end
+        forceUpdate(dev)
     end
 end
 
 function disarm(dev)
     D("disarm() disarming!")
-    luup.variable_set(SSSID, "Armed", "0", dev)
+    if isArmed(dev) then
+        luup.variable_set(SSSID, "Armed", "0", dev)
+    end
     luup.variable_set(SSSID, "ArmedTripped", "0", dev)
 end
 
@@ -636,5 +659,6 @@ function init(dev)
     runOnce(dev)
 
     -- Schedule next query
-    scheduleNext(dev)
+    runStamp = os.time()
+    scheduleNext(runStamp, dev)
 end
