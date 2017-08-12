@@ -330,6 +330,12 @@ local function doRequest(url, method, body)
     if logRequest then
         L("Response status %1, body %2", httpStatus, respBody)
     end
+    
+    -- Handle special errors from socket library
+    if tonumber(httpStatus) == nil then
+        respBody = httpStatus
+        httpStatus = 500
+    end
 
     -- See what happened. Anything 2xx we reduce to 200 (OK).
     if httpStatus >= 200 and httpStatus <= 299 then
@@ -429,6 +435,12 @@ local function doMatchQuery( type, method )
     D("doMatchQuery() returned from request(), cond=%1, httpStatus=%2, httpHeaders=%3", cond or "nil", httpStatus, httpHeaders)
     if logRequest then
         L("Response status %1 with matched %2", httpStatus, matched)
+    end
+
+    -- Handle special errors from socket library
+    if tonumber(httpStatus) == nil then
+        respBody = httpStatus
+        httpStatus = 500
     end
 
     if cond == nil or (cond == 1 and httpStatus == 200) then
