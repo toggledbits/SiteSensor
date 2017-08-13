@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <implementation>
+    <files>L_LuxaXP.lua</files>
     <functions>
         -- -------------------------------------------------------------------------------------------------------------------------
         -- SiteSensor
@@ -13,7 +14,6 @@
             SiteSensor.init(dev)
         end
     </functions>
-    <files>L_LuxaXP.lua</files>
     <startup>startupSiteSensor</startup>
     <actionList>
         <action>
