@@ -23,7 +23,7 @@ local idata = {} -- per-instance data
 
 local isALTUI = false
 local isOpenLuup = false
-local debugMode = false
+local debugMode = true
 local traceMode = false
 
 local https = require("ssl.https")
@@ -609,8 +609,8 @@ end
 local function checkVersion(dev)
     assert(dev ~= nil)
     assert(idata[dev] ~= nil)
-    D("checkVersion() branch %1 major %2 minor %3, string %4", luup.version_branch, luup.version_major, luup.version_minor, luup.version)
-    if isOpenLuup or ( luup.version_branch == 1 and luup.version_major > 7 ) then
+    D("checkVersion() branch %1 major %2 minor %3, string %4, openLuup %5", luup.version_branch, luup.version_major, luup.version_minor, luup.version, isOpenLuup)
+    if isOpenLuup or ( luup.version_branch == 1 and luup.version_major >= 7 ) then
         return true
     end
     return false
