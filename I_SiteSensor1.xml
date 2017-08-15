@@ -55,8 +55,8 @@
             <serviceId>urn:micasaverde-com:serviceId:SecuritySensor1</serviceId>
             <name>SetArmed</name>
             <run>
-                local armed = lul_settings.newArmedValue or "0"
-                if armed ~= "0" then
+                local armed = tonumber(lul_settings.newArmedValue or "0", 10)
+                if armed ~= 0 then
                     SiteSensor.arm(lul_device)
                 else
                     SiteSensor.disarm(lul_device)
