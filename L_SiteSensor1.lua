@@ -15,13 +15,15 @@ local _VERSION = "1.2dev"
 local _CONFIGVERSION = 010200
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
+local MYTYPE = "urn:schemas-toggledbits-com:device:SiteSensor:1"
 local SSSID = "urn:micasaverde-com:serviceId:SecuritySensor1"
 local HASID = "urn:micasaverde-com:serviceId:HaDevice1"
 
 local idata = {} -- per-instance data
 
+local isALTUI = false
 local isOpenLuup = false
-local debugMode = true
+local debugMode = false
 local traceMode = false
 
 local https = require("ssl.https")
@@ -91,6 +93,7 @@ local function dump(t)
 end
 
 local function L(msg, ...)
+    local str
     if type(msg) == "table" then
         str = msg["prefix"] .. msg["msg"]
     else
@@ -607,9 +610,7 @@ local function checkVersion(dev)
     assert(dev ~= nil)
     assert(idata[dev] ~= nil)
     D("checkVersion() branch %1 major %2 minor %3, string %4", luup.version_branch, luup.version_major, luup.version_minor, luup.version)
-    isOpenLuup = luup.devices[2].description:find("openLuup")
-    if isOpenLuup then D("checkVersion() openLuup detected!") end
-    if ( luup.version_branch == 1 and luup.version_major == 7 ) then
+    if isOpenLuup or ( luup.version_branch == 1 and luup.version_major > 7 ) then
         return true
     end
     return false
@@ -733,6 +734,23 @@ function init(dev)
     -- Initialize instance data
     idata[dev] = {}
     
+    -- Check for ALTUI and OpenLuup
+    local k,v
+    for k,v in pairs(luup.devices) do
+        if v.device_type == "urn:schemas-upnp-org:device:altui:1" then
+            local rc,rs,jj,ra
+            D("init() detected ALTUI at %1", k)
+            isALTUI = true
+            rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin", 
+                { newDeviceType=MYTYPE, newScriptFile="J_SiteSensor1_ALTUI.js", newDeviceDrawFunc="SiteSensor_ALTUI.DeviceDraw" }, 
+                k )
+            D("init() ALTUI's RegisterPlugin action returned resultCode=%1, resultString=%2, job=%3, returnArguments=%4", rc,rs,jj,ra)
+        elseif v.device_type == "openLuup" then
+            D("init() detected openLuup")
+            isOpenLuup = true
+        end
+    end
+
     -- Make sure we're in the right environment
     if not checkVersion(dev) then
         setMessage("Unsupported firmware", dev)
