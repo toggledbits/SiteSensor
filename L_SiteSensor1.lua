@@ -11,7 +11,7 @@
 
 module("L_SiteSensor1", package.seeall)
 
-local _VERSION = "1.2dev"
+local _VERSION = "1.2"
 local _CONFIGVERSION = 010200
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
@@ -23,7 +23,7 @@ local idata = {} -- per-instance data
 
 local isALTUI = false
 local isOpenLuup = false
-local debugMode = true
+local debugMode = false
 local traceMode = false
 
 local https = require("ssl.https")
