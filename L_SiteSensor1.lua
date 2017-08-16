@@ -463,7 +463,7 @@ local function doMatchQuery( dev )
         if (lastVal == nil or lastVal ~= matchValue) then
             luup.variable_set(MYSID, "LastMatchValue", matchValue, dev)
         end
-        fail(false)
+        fail(false, dev)
     else
         setMessage("Invalid response (" .. tostring(httpStatus) .. ")", dev)
         luup.variable_set(MYSID, "LastMatchValue", "", dev)
