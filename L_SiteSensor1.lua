@@ -24,51 +24,12 @@ local idata = {} -- per-instance data
 local isALTUI = false
 local isOpenLuup = false
 local debugMode = false
-local traceMode = false
 
 local https = require("ssl.https")
 local http = require("socket.http")
 local ltn12 = require("ltn12")
 local dkjson = require('dkjson')
 local luaxp = require("L_LuaXP")
-
-local function trace( typ, msg )
-    local ts = os.time()
-    local r
-    local t = {
-        ["type"]=typ,
-        plugin="SiteSensor",
-        pluginVersion=_CONFIGVERSION,
-        serial=luup.pk_accesspoint,
-        systime=ts,
-        sysver=luup.version,
-        longitude=luup.longitude,
-        latitude=luup.latitude,
-        timezone=luup.timezone,
-        city=luup.city,
-        message=msg
-    }
-
-    local tHeaders = {}
-    local body = dkjson.encode(t)
-    tHeaders["Content-Type"] = "application/json"
-    tHeaders["Content-Length"] = string.len(body)
-
-    -- Make the request.
-    local respBody, httpStatus, httpHeaders
-    http.TIMEOUT = 10
-    respBody, httpStatus, httpHeaders = http.request{
-        url = "http://www.toggledbits.com/luuptrace/",
-        source = ltn12.source.string(body),
-        sink = ltn12.sink.table(r),
-        method = "POST",
-        headers = tHeaders,
-        redirect = false
-    }
-    if httpStatus == 401 or httpStatus == 404 then
-        traceMode = false
-    end
-end
 
 local function dump(t)
     if t == nil then return "nil" end
@@ -112,9 +73,6 @@ local function L(msg, ...)
         end
     )
     luup.log(str)
-    if traceMode then
-        pcall( trace, "log", str )
-    end
 end
 
 local function D(msg, ...)
