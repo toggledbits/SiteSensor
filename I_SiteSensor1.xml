@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <implementation>
+    <files>L_LuxaXP.lua</files>
     <functions>
         -- -------------------------------------------------------------------------------------------------------------------------
         -- SiteSensor
@@ -13,16 +14,8 @@
             SiteSensor.init(dev)
         end
     </functions>
-    <files>L_LuxaXP.lua</files>
     <startup>startupSiteSensor</startup>
     <actionList>
-        <action>
-            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
-            <name>GetStatus</name>
-            <run>
-                return -- what we do here doesn't matter, luup uses the relatedStateVariable directly
-            </run>
-        </action>
         <action>
             <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
             <name>GetInterval</name>
@@ -36,7 +29,11 @@
             <run>
                 local newInterval = lul_settings.newTargetValue
                 if newInterval ~= nil then newInterval = tonumber(newInterval, 10) end
-                luup.variable_set("urn:toggledbits-com:serviceId:SiteSensor1", "Interval", newInterval, lul_device)
+                if newInterval ~= nil and newInterval >= 60 then
+                    luup.variable_set("urn:toggledbits-com:serviceId:SiteSensor1", "Interval", newInterval, lul_device)
+                    return true
+                end
+                return false
             </run>
         </action>
         <action>
@@ -58,20 +55,13 @@
             <serviceId>urn:micasaverde-com:serviceId:SecuritySensor1</serviceId>
             <name>SetArmed</name>
             <run>
-                local armed = lul_settings.newArmedValue or "0"
-                if armed == "1" then
+                local armed = tonumber(lul_settings.newArmedValue or "0", 10)
+                if armed ~= 0 then
                     SiteSensor.arm(lul_device)
                 else
                     SiteSensor.disarm(lul_device)
                 end
                 return true
-            </run>
-        </action>
-        <action>
-            <serviceId>urn:micasaverde-com:serviceId:SecuritySensor1</serviceId>
-            <name>GetArmed</name>
-            <run>
-                return -- what we do here doesn't matter, luup uses the relatedStateVariable directly
             </run>
         </action>
     </actionList>

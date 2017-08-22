@@ -1,565 +1,565 @@
 {
-	"default_icon": "http://www.toggledbits.com/sitesensor/assets/sitesensor-default.png",
-	"state_icons": [
+    "default_icon": "http://www.toggledbits.com/sitesensor/assets/sitesensor-default.png",
+    "state_icons": [
         {
-			"img": "http://www.toggledbits.com/sitesensor/assets/sitesensor-failed.png",
-			"conditions": [{
-				"service": "urn:toggledbits-com:serviceId:SiteSensor1",
-				"variable": "Failed",
-				"operator": "==",
-				"value": 1,
-				"subcategory_num": 0
-			}]
-		},
-		{
-			"img": "http://www.toggledbits.com/sitesensor/assets/sitesensor-tripped.png",
-			"conditions": [{
-				"service": "urn:micasaverde-com:serviceId:SecuritySensor1",
-				"variable": "Tripped",
-				"operator": "==",
-				"value": 1,
-				"subcategory_num": 0
-			}]
-		},
-		{
-			"img": "http://www.toggledbits.com/sitesensor/assets/sitesensor-armed.png",
-			"conditions": [{
-				"service": "urn:micasaverde-com:serviceId:SecuritySensor1",
-				"variable": "Armed",
-				"operator": "==",
-				"value": 1,
-				"subcategory_num": 0
-			}]
-		}
-	],
-	"x": "2",
-	"y": "3",
-	"inScene": "1",
-	"Tabs": [{
-			"Label": {
-				"lang_tag": "ui7_tabname_control",
-				"text": "Control"
-			},
-			"Position": "0",
-			"TabType": "flash",
-			"top_navigation_tab": 1,
-			"TopNavigationTab": 1,
-			"ControlGroup": [{
-				"id": "1",
-				"isSingle": "1",
-				"scenegroup": "1"
-			}],
-			"SceneGroup": [{
-				"id": "1",
-				"top": "0",
-				"left": "1",
-				"x": "2",
-				"y": "1"
-			}],
-			"Control": [{
-					"ControlGroup": "1",
-					"ControlType": "multi_state_button",
-					"top": "0",
-					"left": "0",
-					"states": [{
-							"Label": {
-								"lang_tag": "ui7_cmd_arm",
-								"text": "Armed"
-							},
-							"Display": {
-								"Service": "urn:micasaverde-com:serviceId:SecuritySensor1",
-								"Variable": "Armed",
-								"Value": "1"
-							},
-							"Command": {
-								"Service": "urn:micasaverde-com:serviceId:SecuritySensor1",
-								"Action": "SetArmed",
-								"Parameters": [{
-									"Name": "newArmedValue",
-									"Value": "1"
-								}]
-							},
-							"ControlCode": "arm_armed"
-						},
-						{
-							"Label": {
-								"lang_tag": "ui7_cmd_bypass",
-								"text": "Disarmed"
-							},
-							"Display": {
-								"Service": "urn:micasaverde-com:serviceId:SecuritySensor1",
-								"Variable": "Armed",
-								"Value": "0"
-							},
-							"Command": {
-								"Service": "urn:micasaverde-com:serviceId:SecuritySensor1",
-								"Action": "SetArmed",
-								"Parameters": [{
-									"Name": "newArmedValue",
-									"Value": "0"
-								}]
-							},
-							"ControlCode": "arm_disarmed"
-						}
-					]
-				},
-				{
-					"ControlType": "variable",
-					"ControlGroup": "1",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 3,
-					"Display": {
-						"Top": 16,
-						"Left": 96,
-						"Width": 288,
-						"Height": 32,
-						"Service": "urn:toggledbits-com:serviceId:SiteSensor1",
-						"Variable": "Message"
-					}
-				},
+            "img": "http://www.toggledbits.com/sitesensor/assets/sitesensor-failed.png",
+            "conditions": [{
+                "service": "urn:toggledbits-com:serviceId:SiteSensor1",
+                "variable": "Failed",
+                "operator": "==",
+                "value": 1,
+                "subcategory_num": 0
+            }]
+        },
+        {
+            "img": "http://www.toggledbits.com/sitesensor/assets/sitesensor-tripped.png",
+            "conditions": [{
+                "service": "urn:micasaverde-com:serviceId:SecuritySensor1",
+                "variable": "Tripped",
+                "operator": "==",
+                "value": 1,
+                "subcategory_num": 0
+            }]
+        },
+        {
+            "img": "http://www.toggledbits.com/sitesensor/assets/sitesensor-armed.png",
+            "conditions": [{
+                "service": "urn:micasaverde-com:serviceId:SecuritySensor1",
+                "variable": "Armed",
+                "operator": "==",
+                "value": 1,
+                "subcategory_num": 0
+            }]
+        }
+    ],
+    "x": "2",
+    "y": "4",
+    "inScene": "1",
+    "Tabs": [{
+            "Label": {
+                "lang_tag": "ui7_tabname_control",
+                "text": "Control"
+            },
+            "Position": "0",
+            "TabType": "flash",
+            "top_navigation_tab": 1,
+            "TopNavigationTab": 1,
+            "ControlGroup": [{
+                "id": "1",
+                "isSingle": "1",
+                "scenegroup": "1"
+            }],
+            "SceneGroup": [{
+                "id": "1",
+                "top": "0",
+                "left": "1",
+                "x": "2",
+                "y": "1"
+            }],
+            "Control": [{
+                    "ControlGroup": "1",
+                    "ControlType": "multi_state_button",
+                    "top": "0",
+                    "left": "0",
+                    "states": [{
+                            "Label": {
+                                "lang_tag": "ui7_cmd_arm",
+                                "text": "Armed"
+                            },
+                            "Display": {
+                                "Service": "urn:micasaverde-com:serviceId:SecuritySensor1",
+                                "Variable": "Armed",
+                                "Value": "1"
+                            },
+                            "Command": {
+                                "Service": "urn:micasaverde-com:serviceId:SecuritySensor1",
+                                "Action": "SetArmed",
+                                "Parameters": [{
+                                    "Name": "newArmedValue",
+                                    "Value": "1"
+                                }]
+                            },
+                            "ControlCode": "arm_armed"
+                        },
+                        {
+                            "Label": {
+                                "lang_tag": "ui7_cmd_bypass",
+                                "text": "Disarmed"
+                            },
+                            "Display": {
+                                "Service": "urn:micasaverde-com:serviceId:SecuritySensor1",
+                                "Variable": "Armed",
+                                "Value": "0"
+                            },
+                            "Command": {
+                                "Service": "urn:micasaverde-com:serviceId:SecuritySensor1",
+                                "Action": "SetArmed",
+                                "Parameters": [{
+                                    "Name": "newArmedValue",
+                                    "Value": "0"
+                                }]
+                            },
+                            "ControlCode": "arm_disarmed"
+                        }
+                    ]
+                },
+                {
+                    "ControlType": "variable",
+                    "ControlGroup": "1",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 3,
+                    "Display": {
+                        "Top": 16,
+                        "Left": 96,
+                        "Width": 288,
+                        "Height": 32,
+                        "Service": "urn:toggledbits-com:serviceId:SiteSensor1",
+                        "Variable": "Message"
+                    }
+                },
 
-				{
-					"ControlType": "label",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 0.25,
-					"Display": {
-						"Top": 60,
-						"Left": 0,
-						"Width": 24,
-						"Height": 24
-					},
-					"Label": {
-						"lang_tag": "tb_label1",
-						"text": "[1]"
-					}
-				},
-				{
-					"ControlType": "variable",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 1.75,
-					"Display": {
-						"Top": 60,
-						"Left": 32,
-						"Width": 168,
-						"Height": 24,
-						"Service": "urn:toggledbits-com:serviceId:SiteSensor1",
-						"Variable": "Value1"
-					}
-				},
-				{
-					"ControlType": "label",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 0.25,
-					"Display": {
-						"Top": 60,
-						"Left": 208,
-						"Width": 24,
-						"Height": 24
-					},
-					"Label": {
-						"lang_tag": "tb_label5",
-						"text": "[5]"
-					}
-				},
-				{
-					"ControlType": "variable",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 1.75,
-					"Display": {
-						"Top": 60,
-						"Left": 240,
-						"Width": 168,
-						"Height": 24,
-						"Service": "urn:toggledbits-com:serviceId:SiteSensor1",
-						"Variable": "Value5"
-					}
-				},
-				{
-					"ControlType": "label",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 0.25,
-					"Display": {
-						"Top": 84,
-						"Left": 0,
-						"Width": 24,
-						"Height": 24
-					},
-					"Label": {
-						"lang_tag": "tb_label2",
-						"text": "[2]"
-					}
-				},
-				{
-					"ControlType": "variable",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 1.75,
-					"Display": {
-						"Top": 84,
-						"Left": 32,
-						"Width": 168,
-						"Height": 24,
-						"Service": "urn:toggledbits-com:serviceId:SiteSensor1",
-						"Variable": "Value2"
-					}
-				},
-				{
-					"ControlType": "label",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 0.25,
-					"Display": {
-						"Top": 84,
-						"Left": 208,
-						"Width": 24,
-						"Height": 24
-					},
-					"Label": {
-						"lang_tag": "tb_label6",
-						"text": "[6]"
-					}
-				},
-				{
-					"ControlType": "variable",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 1.75,
-					"Display": {
-						"Top": 84,
-						"Left": 240,
-						"Width": 168,
-						"Height": 24,
-						"Service": "urn:toggledbits-com:serviceId:SiteSensor1",
-						"Variable": "Value6"
-					}
-				},
-				{
-					"ControlType": "label",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 0.25,
-					"Display": {
-						"Top": 108,
-						"Left": 0,
-						"Width": 24,
-						"Height": 24
-					},
-					"Label": {
-						"lang_tag": "tb_label3",
-						"text": "[3]"
-					}
-				},
-				{
-					"ControlType": "variable",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 1.75,
-					"Display": {
-						"Top": 108,
-						"Left": 32,
-						"Width": 168,
-						"Height": 24,
-						"Service": "urn:toggledbits-com:serviceId:SiteSensor1",
-						"Variable": "Value3"
-					}
-				},
-				{
-					"ControlType": "label",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 0.25,
-					"Display": {
-						"Top": 108,
-						"Left": 208,
-						"Width": 24,
-						"Height": 24
-					},
-					"Label": {
-						"lang_tag": "tb_label7",
-						"text": "[7]"
-					}
-				},
-				{
-					"ControlType": "variable",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 1.75,
-					"Display": {
-						"Top": 108,
-						"Left": 240,
-						"Width": 168,
-						"Height": 24,
-						"Service": "urn:toggledbits-com:serviceId:SiteSensor1",
-						"Variable": "Value7"
-					}
-				},
-				{
-					"ControlType": "label",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 0.25,
-					"Display": {
-						"Top": 132,
-						"Left": 0,
-						"Width": 24,
-						"Height": 24
-					},
-					"Label": {
-						"lang_tag": "tb_label4",
-						"text": "[4]"
-					}
-				},
-				{
-					"ControlType": "variable",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 1.75,
-					"Display": {
-						"Top": 132,
-						"Left": 32,
-						"Width": 168,
-						"Height": 24,
-						"Service": "urn:toggledbits-com:serviceId:SiteSensor1",
-						"Variable": "Value4"
-					}
-				},
-				{
-					"ControlType": "label",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 0.25,
-					"Display": {
-						"Top": 132,
-						"Left": 208,
-						"Width": 24,
-						"Height": 24
-					},
-					"Label": {
-						"lang_tag": "tb_label8",
-						"text": "[8]"
-					}
-				},
-				{
-					"ControlType": "variable",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 1.75,
-					"Display": {
-						"Top": 132,
-						"Left": 240,
-						"Width": 168,
-						"Height": 24,
-						"Service": "urn:toggledbits-com:serviceId:SiteSensor1",
-						"Variable": "Value8"
-					}
-				},
-				{
-					"ControlType": "label",
-					"top": 0,
-					"left": 0,
-					"HorizontalMultiplier": 4,
-					"Display": {
-						"Top": 156,
-						"Left": 0,
-						"Width": 384,
-						"Height": 24
-					},
-					"Label": {
-						"lang_tag": "tb_sitesensor_about",
-						"text": "SiteSensor ver 1.0.1 2017-08-09<br/>For documentation or to report bugs, please go to the <a target='_blank' href='https://github.com/toggledbits/sitesensor'>SiteSensor Github repository</a>.<br/>This plugin is offered for use as-is and without warranties of any kind. By using this plugin,<br/>you agree to assume all risks in connection with its use without limitation."
-					}
-				}
-			]
-		},
-		{
-			"Label": {
-				"lang_tag": "tb_sitesensor_settings",
-				"text": "Settings"
-			},
-			"Position": "1",
-			"TabType": "javascript",
-			"ScriptName": "J_SiteSensor1_UI7.js",
-			"Function": "SiteSensor.configurePlugin"
-		},
-		{
-			"Label": {
-				"lang_tag": "ui7_advanced",
-				"text": "Advanced"
-			},
-			"Position": "2",
-			"TabType": "javascript",
-			"ScriptName": "shared.js",
-			"Function": "advanced_device"
-		},
-		{
-			"Label": {
-				"lang_tag": "ui7_device_options",
-				"text": "Device Options"
-			},
-			"Position": "3",
-			"TabType": "javascript",
-			"ScriptName": "shared.js",
-			"Function": "device_zwave_options"
-		},
-		{
-			"Label": {
-				"lang_tag": "ui7_logs",
-				"text": "Logs"
-			},
-			"Position": "4",
-			"TabType": "javascript",
-			"ScriptName": "shared.js",
-			"Function": "device_logs"
-		},
-		{
-			"Label": {
-				"lang_tag": "ui7_notifications",
-				"text": "Notifications"
-			},
-			"Position": "5",
-			"TabType": "javascript",
-			"ScriptName": "shared.js",
-			"Function": "device_notifications"
-		},
-		{
-			"Label": {
-				"lang_tag": "ui7_device_scenes",
-				"text": "Scenes"
-			},
-			"Position": "6",
-			"TabType": "javascript",
-			"ScriptName": "shared.js",
-			"Function": "device_scenes"
-		}
-	],
-	"sceneList": {
-		"group_1": {
-			"cmd_1": {
-				"label": "Arm",
-				"serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
-				"action": "SetArmed",
-				"arguments": {
-					"newArmedValue": "1"
-				},
-				"display": {
-					"service": "urn:micasaverde-com:serviceId:SecuritySensor1",
-					"variable": "Armed",
-					"value": "1"
-				}
-			},
-			"cmd_2": {
-				"label": "Bypass",
-				"serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
-				"action": "SetArmed",
-				"arguments": {
-					"newTargetValue": "0"
-				},
-				"display": {
-					"service": "urn:micasaverde-com:serviceId:SecuritySensor1",
-					"variable": "Armed",
-					"value": "0"
-				}
-			}
-		}
-	},
-	"eventList2": [{
-			"id": 1,
-			"label": {
-				"lang_tag": "tb_an_armed_sitesensor_is_tripped",
-				"text": "Whenever _DEVICE_NAME_ is armed and tripped"
-			},
-			"serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
-			"serviceStateTable": {
-				"Armed": {
-					"value": "1",
-					"comparisson": "="
-				},
-				"Tripped": {
-					"value": "1",
-					"comparisson": "="
-				}
-			}
-		},
-		{
-			"id": 2,
-			"label": {
-				"lang_tag": "tb_an_armed_sitesensor_is_not_tripped",
-				"text": "Whenever _DEVICE_NAME_ is armed and not tripped"
-			},
-			"serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
-			"serviceStateTable": {
-				"Armed": {
-					"value": "1",
-					"comparisson": "="
-				},
-				"Tripped": {
-					"value": "0",
-					"comparisson": "="
-				}
-			}
-		},
-		{
-			"id": 3,
-			"label": {
-				"lang_tag": "tb_sitesensor_is_tripped",
-				"text": "Whenever _DEVICE_NAME_ is tripped whether is armed or disarmed"
-			},
-			"serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
-			"serviceStateTable": {
-				"Tripped": {
-					"value": "1",
-					"comparisson": "="
-				}
-			}
-		},
-		{
-			"id": 4,
-			"label": {
-				"lang_tag": "tb_sitesensor_is_not_tripped",
-				"text": "Whenever _DEVICE_NAME_ is not tripped whether is armed or disarmed"
-			},
-			"serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
-			"serviceStateTable": {
-				"Tripped": {
-					"value": "0",
-					"comparisson": "="
-				}
-			}
-		},
-		{
-			"id": 5,
-			"label": {
-				"lang_tag": "tb_sitesensor_is_failed",
-				"text": "Whenever _DEVICE_NAME_ is in a failed state"
-			},
-			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
-			"serviceStateTable": {
-				"Failed": {
-					"value": "1",
-					"comparisson": "="
-				}
-			}
-		},
-		{
-			"id": 6,
-			"label": {
-				"lang_tag": "tb_sitesensor_is_not_failed",
-				"text": "Whenever _DEVICE_NAME_ is not in a failed state"
-			},
-			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
-			"serviceStateTable": {
-				"Failed": {
-					"value": "0",
-					"comparisson": "="
-				}
-			}
-		}
-	],
-	"device_type": "urn:schemas-toggledbits-com:device:SiteSensor:1"
+                {
+                    "ControlType": "label",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 0.25,
+                    "Display": {
+                        "Top": 60,
+                        "Left": 0,
+                        "Width": 24,
+                        "Height": 24
+                    },
+                    "Label": {
+                        "lang_tag": "tb_label1",
+                        "text": "[1]"
+                    }
+                },
+                {
+                    "ControlType": "variable",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 1.75,
+                    "Display": {
+                        "Top": 60,
+                        "Left": 32,
+                        "Width": 168,
+                        "Height": 24,
+                        "Service": "urn:toggledbits-com:serviceId:SiteSensor1",
+                        "Variable": "Value1"
+                    }
+                },
+                {
+                    "ControlType": "label",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 0.25,
+                    "Display": {
+                        "Top": 60,
+                        "Left": 208,
+                        "Width": 24,
+                        "Height": 24
+                    },
+                    "Label": {
+                        "lang_tag": "tb_label5",
+                        "text": "[5]"
+                    }
+                },
+                {
+                    "ControlType": "variable",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 1.75,
+                    "Display": {
+                        "Top": 60,
+                        "Left": 240,
+                        "Width": 168,
+                        "Height": 24,
+                        "Service": "urn:toggledbits-com:serviceId:SiteSensor1",
+                        "Variable": "Value5"
+                    }
+                },
+                {
+                    "ControlType": "label",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 0.25,
+                    "Display": {
+                        "Top": 84,
+                        "Left": 0,
+                        "Width": 24,
+                        "Height": 24
+                    },
+                    "Label": {
+                        "lang_tag": "tb_label2",
+                        "text": "[2]"
+                    }
+                },
+                {
+                    "ControlType": "variable",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 1.75,
+                    "Display": {
+                        "Top": 84,
+                        "Left": 32,
+                        "Width": 168,
+                        "Height": 24,
+                        "Service": "urn:toggledbits-com:serviceId:SiteSensor1",
+                        "Variable": "Value2"
+                    }
+                },
+                {
+                    "ControlType": "label",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 0.25,
+                    "Display": {
+                        "Top": 84,
+                        "Left": 208,
+                        "Width": 24,
+                        "Height": 24
+                    },
+                    "Label": {
+                        "lang_tag": "tb_label6",
+                        "text": "[6]"
+                    }
+                },
+                {
+                    "ControlType": "variable",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 1.75,
+                    "Display": {
+                        "Top": 84,
+                        "Left": 240,
+                        "Width": 168,
+                        "Height": 24,
+                        "Service": "urn:toggledbits-com:serviceId:SiteSensor1",
+                        "Variable": "Value6"
+                    }
+                },
+                {
+                    "ControlType": "label",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 0.25,
+                    "Display": {
+                        "Top": 108,
+                        "Left": 0,
+                        "Width": 24,
+                        "Height": 24
+                    },
+                    "Label": {
+                        "lang_tag": "tb_label3",
+                        "text": "[3]"
+                    }
+                },
+                {
+                    "ControlType": "variable",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 1.75,
+                    "Display": {
+                        "Top": 108,
+                        "Left": 32,
+                        "Width": 168,
+                        "Height": 24,
+                        "Service": "urn:toggledbits-com:serviceId:SiteSensor1",
+                        "Variable": "Value3"
+                    }
+                },
+                {
+                    "ControlType": "label",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 0.25,
+                    "Display": {
+                        "Top": 108,
+                        "Left": 208,
+                        "Width": 24,
+                        "Height": 24
+                    },
+                    "Label": {
+                        "lang_tag": "tb_label7",
+                        "text": "[7]"
+                    }
+                },
+                {
+                    "ControlType": "variable",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 1.75,
+                    "Display": {
+                        "Top": 108,
+                        "Left": 240,
+                        "Width": 168,
+                        "Height": 24,
+                        "Service": "urn:toggledbits-com:serviceId:SiteSensor1",
+                        "Variable": "Value7"
+                    }
+                },
+                {
+                    "ControlType": "label",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 0.25,
+                    "Display": {
+                        "Top": 132,
+                        "Left": 0,
+                        "Width": 24,
+                        "Height": 24
+                    },
+                    "Label": {
+                        "lang_tag": "tb_label4",
+                        "text": "[4]"
+                    }
+                },
+                {
+                    "ControlType": "variable",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 1.75,
+                    "Display": {
+                        "Top": 132,
+                        "Left": 32,
+                        "Width": 168,
+                        "Height": 24,
+                        "Service": "urn:toggledbits-com:serviceId:SiteSensor1",
+                        "Variable": "Value4"
+                    }
+                },
+                {
+                    "ControlType": "label",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 0.25,
+                    "Display": {
+                        "Top": 132,
+                        "Left": 208,
+                        "Width": 24,
+                        "Height": 24
+                    },
+                    "Label": {
+                        "lang_tag": "tb_label8",
+                        "text": "[8]"
+                    }
+                },
+                {
+                    "ControlType": "variable",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 1.75,
+                    "Display": {
+                        "Top": 132,
+                        "Left": 240,
+                        "Width": 168,
+                        "Height": 24,
+                        "Service": "urn:toggledbits-com:serviceId:SiteSensor1",
+                        "Variable": "Value8"
+                    }
+                },
+                {
+                    "ControlType": "label",
+                    "top": 0,
+                    "left": 0,
+                    "HorizontalMultiplier": 4,
+                    "Display": {
+                        "Top": 156,
+                        "Left": 0,
+                        "Width": 384,
+                        "Height": 64
+                    },
+                    "Label": {
+                        "lang_tag": "tb_sitesensor_about",
+                        "text": "SiteSensor ver 1.2 2017-08-15 &#169; Patrick H. Rigney, All Rights Reserved. For documentation and license information, go to <a target='_blank' href='http://www.toggledbits.com/sitesensor/'>http://www.toggledbits.com/sitesensor/</a>. Use of this plugin constitutes acceptance of and agreement to the license terms without limitation or exclusion."
+                    }
+                }
+            ]
+        },
+        {
+            "Label": {
+                "lang_tag": "tb_sitesensor_settings",
+                "text": "Settings"
+            },
+            "Position": "1",
+            "TabType": "javascript",
+            "ScriptName": "J_SiteSensor1_UI7.js",
+            "Function": "SiteSensor.configurePlugin"
+        },
+        {
+            "Label": {
+                "lang_tag": "ui7_advanced",
+                "text": "Advanced"
+            },
+            "Position": "2",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "advanced_device"
+        },
+        {
+            "Label": {
+                "lang_tag": "ui7_device_options",
+                "text": "Device Options"
+            },
+            "Position": "3",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_zwave_options"
+        },
+        {
+            "Label": {
+                "lang_tag": "ui7_logs",
+                "text": "Logs"
+            },
+            "Position": "4",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_logs"
+        },
+        {
+            "Label": {
+                "lang_tag": "ui7_notifications",
+                "text": "Notifications"
+            },
+            "Position": "5",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_notifications"
+        },
+        {
+            "Label": {
+                "lang_tag": "ui7_device_scenes",
+                "text": "Scenes"
+            },
+            "Position": "6",
+            "TabType": "javascript",
+            "ScriptName": "shared.js",
+            "Function": "device_scenes"
+        }
+    ],
+    "sceneList": {
+        "group_1": {
+            "cmd_1": {
+                "label": "Arm",
+                "serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
+                "action": "SetArmed",
+                "arguments": {
+                    "newArmedValue": "1"
+                },
+                "display": {
+                    "service": "urn:micasaverde-com:serviceId:SecuritySensor1",
+                    "variable": "Armed",
+                    "value": "1"
+                }
+            },
+            "cmd_2": {
+                "label": "Bypass",
+                "serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
+                "action": "SetArmed",
+                "arguments": {
+                    "newTargetValue": "0"
+                },
+                "display": {
+                    "service": "urn:micasaverde-com:serviceId:SecuritySensor1",
+                    "variable": "Armed",
+                    "value": "0"
+                }
+            }
+        }
+    },
+    "eventList2": [{
+            "id": 1,
+            "label": {
+                "lang_tag": "tb_an_armed_sitesensor_is_tripped",
+                "text": "Whenever _DEVICE_NAME_ is armed and tripped"
+            },
+            "serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
+            "serviceStateTable": {
+                "Armed": {
+                    "value": "1",
+                    "comparisson": "="
+                },
+                "Tripped": {
+                    "value": "1",
+                    "comparisson": "="
+                }
+            }
+        },
+        {
+            "id": 2,
+            "label": {
+                "lang_tag": "tb_an_armed_sitesensor_is_not_tripped",
+                "text": "Whenever _DEVICE_NAME_ is armed and not tripped"
+            },
+            "serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
+            "serviceStateTable": {
+                "Armed": {
+                    "value": "1",
+                    "comparisson": "="
+                },
+                "Tripped": {
+                    "value": "0",
+                    "comparisson": "="
+                }
+            }
+        },
+        {
+            "id": 3,
+            "label": {
+                "lang_tag": "tb_sitesensor_is_tripped",
+                "text": "Whenever _DEVICE_NAME_ is tripped whether is armed or disarmed"
+            },
+            "serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
+            "serviceStateTable": {
+                "Tripped": {
+                    "value": "1",
+                    "comparisson": "="
+                }
+            }
+        },
+        {
+            "id": 4,
+            "label": {
+                "lang_tag": "tb_sitesensor_is_not_tripped",
+                "text": "Whenever _DEVICE_NAME_ is not tripped whether is armed or disarmed"
+            },
+            "serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
+            "serviceStateTable": {
+                "Tripped": {
+                    "value": "0",
+                    "comparisson": "="
+                }
+            }
+        },
+        {
+            "id": 5,
+            "label": {
+                "lang_tag": "tb_sitesensor_is_failed",
+                "text": "Whenever _DEVICE_NAME_ is in a failed state"
+            },
+            "serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+            "serviceStateTable": {
+                "Failed": {
+                    "value": "1",
+                    "comparisson": "="
+                }
+            }
+        },
+        {
+            "id": 6,
+            "label": {
+                "lang_tag": "tb_sitesensor_is_not_failed",
+                "text": "Whenever _DEVICE_NAME_ is not in a failed state"
+            },
+            "serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+            "serviceStateTable": {
+                "Failed": {
+                    "value": "0",
+                    "comparisson": "="
+                }
+            }
+        }
+    ],
+    "device_type": "urn:schemas-toggledbits-com:device:SiteSensor:1"
 }
