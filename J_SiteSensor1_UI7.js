@@ -45,7 +45,7 @@ var SiteSensor = (function(api) {
             var i, j, roomObj, roomid, html = "";
 
             html += "<style>";
-            html += ".tb-cgroup { padding: 0px 32px 0px 0px }"
+            html += ".tb-cgroup { padding: 0px 32px 0px 0px }";
             html += "</style>";
 
             // Request URL
