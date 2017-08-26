@@ -608,7 +608,6 @@ end
 -- format as "stamp:devno"
 function runQuery(p)
     D("runQuery(%1)", p)
-    luup.log("runQuery(): luup.device=" .. tostring(luup.device) .. ", lul_device=" .. tostring(lul_device))
     -- D("runQuery() hackity hack... scheduler.current_device is %1", _G.package.loaded['openLuup.scheduler'].current_device())
     local stepStamp,dev
     
