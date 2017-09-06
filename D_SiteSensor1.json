@@ -399,20 +399,10 @@
         },
         {
             "Label": {
-                "lang_tag": "ui7_device_options",
-                "text": "Device Options"
-            },
-            "Position": "3",
-            "TabType": "javascript",
-            "ScriptName": "shared.js",
-            "Function": "device_zwave_options"
-        },
-        {
-            "Label": {
                 "lang_tag": "ui7_logs",
                 "text": "Logs"
             },
-            "Position": "4",
+            "Position": "3",
             "TabType": "javascript",
             "ScriptName": "shared.js",
             "Function": "device_logs"
@@ -422,7 +412,7 @@
                 "lang_tag": "ui7_notifications",
                 "text": "Notifications"
             },
-            "Position": "5",
+            "Position": "4",
             "TabType": "javascript",
             "ScriptName": "shared.js",
             "Function": "device_notifications"
@@ -432,7 +422,7 @@
                 "lang_tag": "ui7_device_scenes",
                 "text": "Scenes"
             },
-            "Position": "6",
+            "Position": "5",
             "TabType": "javascript",
             "ScriptName": "shared.js",
             "Function": "device_scenes"
