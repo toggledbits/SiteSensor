@@ -11,7 +11,7 @@
             luup.log("SiteSensor Plugin START-UP!")
             SiteSensor = require("L_SiteSensor1")
             siteSensorRunQuery = SiteSensor.runQuery
-            SiteSensor.init(dev)
+            return SiteSensor.init(dev)
         end
     </functions>
     <startup>startupSiteSensor</startup>
