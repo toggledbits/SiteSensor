@@ -109,6 +109,7 @@ end
 
 -- Get numeric variable, or return default value if not set or blank
 local function getVarNumeric( name, dflt, dev, serviceId )
+    assert( dev ~= nil )
     if serviceId == nil then serviceId = MYSID end
     local s = luup.variable_get(serviceId, name, dev)
     if (s == nil or s == "") then return dflt end
@@ -566,7 +567,7 @@ end
 local function runOnce(dev)
     assert(dev ~= nil)
     assert(idata[dev] ~= nil)
-    local rev = getVarNumeric("Version", 0)
+    local rev = getVarNumeric("Version", 0, dev)
     if (rev == 0) then
         -- Initialize for new installation
         D("runOnce() Performing first-time initialization!")
