@@ -11,7 +11,8 @@
 
 module("L_SiteSensor1", package.seeall)
 
-local _VERSION = "1.2"
+local _PLUGIN_NAME = "SiteSensor"
+local _PLUGIN_VERSION = "1.3"
 local _CONFIGVERSION = 010200
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
@@ -46,7 +47,7 @@ local function dump(t)
         else
             val = tostring(v)
         end
-        str = str .. sep .. k .. "=" .. val
+        str = str .. sep .. tostring(k) .. "=" .. val
         sep = ", "
     end
     str = str .. " }"
@@ -58,7 +59,7 @@ local function L(msg, ...)
     if type(msg) == "table" then
         str = msg["prefix"] .. msg["msg"]
     else
-        str = "SiteSensor: " .. msg
+        str = _PLUGIN_NAME .. ": " .. msg
     end
     str = string.gsub(str, "%%(%d+)", function( n )
             n = tonumber(n, 10)
@@ -77,32 +78,16 @@ end
 
 local function D(msg, ...)
     if debugMode then
-        L({msg=msg,prefix="SiteSensor(debug)::"}, unpack(arg))
+        L({msg=msg,prefix=_PLUGIN_NAME .. "(debug)::"}, ...)
     end
 end
 
--- Take a string and split it around sep, returning table (indexed) of substrings
--- For example abc,def,ghi becomes t[1]=abc, t[2]=def, t[3]=ghi
--- Returns: table of values, count of values (integer ge 0)
 local function split(s, sep)
     local t = {}
-    local n = 0
-    if (#s == 0) then return t,n end -- empty string returns nothing
-    local i,j
-    local k = 1
-    repeat
-        i, j = string.find(s, sep or "%s*,%s*", k)
-        if (i == nil) then
-            table.insert(t, string.sub(s, k, -1))
-            n = n + 1
-            break
-        else
-            table.insert(t, string.sub(s, k, i-1))
-            n = n + 1
-            k = j + 1
-        end
-    until k > string.len(s)
-    return t, n
+    if (#s == 0) then return t end -- empty string returns nothing
+    local p = string.format("([^%s]+)", sep or ",")
+    s:gsub(p, function(m) table.insert(t, m) end)
+    return t
 end
 
 local function parseRefExpr(ex, ctx)
@@ -124,6 +109,7 @@ end
 
 -- Get numeric variable, or return default value if not set or blank
 local function getVarNumeric( name, dflt, dev, serviceId )
+    assert( dev ~= nil )
     if serviceId == nil then serviceId = MYSID end
     local s = luup.variable_get(serviceId, name, dev)
     if (s == nil or s == "") then return dflt end
@@ -257,11 +243,13 @@ local function doRequest(url, method, body, dev)
 
     local moreHeaders = luup.variable_get(MYSID, "Headers", dev) or ""
     if string.len(moreHeaders) > 0 then
-        local h,_ = split(moreHeaders, "|")
-        local ix,nh
-        for ix,nh in ipairs(h) do
-            nh = string.gsub(nh, "%%(..)", function( c ) return string.char(tonumber(c,16)) end)
-            table.insert(tHeaders, nh)
+        local h = split(moreHeaders, "|")
+        local ix,hh
+        for ix,hh in ipairs(h) do
+            local nh = split(hh, ":")
+            if #nh == 2 then
+                tHeaders[nh[1]] = string.gsub(nh[2], "%%(..)", function( c ) return string.char(tonumber(c,16)) end)
+            end
         end
     end
 
@@ -339,11 +327,13 @@ local function doMatchQuery( dev )
     local tHeaders = {}
     local moreHeaders = luup.variable_get(MYSID, "Headers", dev) or ""
     if string.len(moreHeaders) > 0 then
-        local h,_ = split(moreHeaders, "|")
-        local ix,nh
-        for ix,nh in ipairs(h) do
-            nh = string.gsub(nh, "%%(..)", function( c ) return string.char(tonumber(c,16)) end)
-            table.insert(tHeaders, nh)
+        local h = split(moreHeaders, "|")
+        local ix,hh
+        for ix,hh in ipairs(h) do
+            local nh = split(hh, ":")
+            if #nh == 2 then
+                tHeaders[nh[1]] = string.gsub(nh[2], "%%(..)", function( c ) return string.char(tonumber(c,16)) end)
+            end
         end
     end
 
@@ -577,7 +567,7 @@ end
 local function runOnce(dev)
     assert(dev ~= nil)
     assert(idata[dev] ~= nil)
-    local rev = getVarNumeric("Version", 0)
+    local rev = getVarNumeric("Version", 0, dev)
     if (rev == 0) then
         -- Initialize for new installation
         D("runOnce() Performing first-time initialization!")
@@ -687,7 +677,7 @@ end
 
 function init(dev)
     D("init(%1)", dev)
-    
+    L("starting plugin version %1 device %2", _PLUGIN_VERSION, dev)
     -- Initialize instance data
     idata[dev] = {}
     
@@ -721,4 +711,6 @@ function init(dev)
     -- Schedule next query.
     idata[dev].runStamp = os.time()
     scheduleNext(dev, nil, idata[dev].runStamp)
+    
+    return true, "OK", _PLUGIN_NAME
 end
