@@ -12,7 +12,7 @@
 module("L_SiteSensor1", package.seeall)
 
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.3"
+local _PLUGIN_VERSION = "1.4dev"
 local _CONFIGVERSION = 010200
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
