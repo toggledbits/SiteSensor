@@ -95,14 +95,14 @@ local function parseRefExpr(ex, ctx)
     local cx, err
     cx, err = luaxp.compile(ex)
     if cx == nil then
-        L("parseRefExpr() failed to parse expression `%1', %2", ex, err)
+        L("Failed to parse expression `%1', %2", ex, err)
         return nil
     end
 
     local val
     val, err = luaxp.run(cx, ctx)
     if val == nil then
-        L("parseRefExpr() failed to execute `%1', %2", ex, err)
+        L("Failed to execute `%1', %2", ex, err)
     end
     return val
 end
@@ -266,7 +266,7 @@ local function doRequest(url, method, body, dev)
     local r = {}
     http.TIMEOUT = timeout -- N.B. http not https, regardless
     if logRequest then
-        L("HTTP %2 %1, headers=%3", url, method, tHeaders)
+        L("%2 %1, headers=%3", url, method, tHeaders)
     end
     respBody, httpStatus, httpHeaders = requestor.request{
         url = url,
@@ -282,7 +282,7 @@ local function doRequest(url, method, body, dev)
     respBody = table.concat(r)
 
     if logRequest then
-        L("Response status %1, body %2", httpStatus, respBody)
+        L("Response status %1, body=%2", httpStatus, respBody)
     end
     
     -- Handle special errors from socket library
@@ -339,6 +339,8 @@ local function doMatchQuery( dev )
 
     D("doMatchQuery() seeking %1 in %2", pattern, url)
 
+    -- We don't use doRequest here because we can stop and close the
+    -- connection as soon as we find our pattern string.
     http.TIMEOUT = timeout
     setMessage("Requesting...", dev)
     if logRequest then
@@ -436,6 +438,7 @@ end
 local function doJSONQuery(dev)
     assert(dev ~= nil)
     assert(idata[dev] ~= nil)
+    local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
     local url = luup.variable_get(MYSID, "RequestURL", dev) or ""
     local timeout = getVarNumeric("Timeout", 30, dev)
     local maxlength = getVarNumeric("MaxLength", 262144, dev)
@@ -446,7 +449,6 @@ local function doJSONQuery(dev)
 
     setMessage("Requesting JSON...", dev)
     err,body,httpStatus = doRequest(url, "GET", nil, dev)
-    D("doJSONQuery() request returned httpStatus=%1, body=%2", httpStatus, body)
     local ctx = { response={}, status={ timestamp=os.time(), valid=0, httpStatus=httpStatus } }
     if body == nil or err then
         -- Error; trip sensor
@@ -491,10 +493,11 @@ local function doJSONQuery(dev)
     for i = 1,8 do
         local r = nil
         local ex = luup.variable_get(MYSID, "Expr" .. tostring(i), dev)
-        D("doJSONQuery() Expr%1=%2", i, ex or "nil")
+        if not logRequest then D("doJSONQuery() Expr%1=%2", i, ex or "nil") end
         if ex ~= nil then
             if string.len(ex) > 0 then
                 r = parseRefExpr(ex, ctx)
+                if logRequest then L("Eval #%1: %2=(%3)%4", i, ex, type(r), r) end
                 D("doJSONQuery() parsed value of %1 is %2", ex, tostring(r))
             end
         else
@@ -527,6 +530,7 @@ local function doJSONQuery(dev)
         local r = nil
         if texp ~= nil then r = parseRefExpr(texp, ctx) end
         D("doJSONQuery() TripExpression result is %1", r)
+        if logRequest then L("Eval trip expression: %1=(%2)%3", texp, type(r), r) end
         if r == nil
             or (type(r) == "boolean" and r == false)
             or (type(r) == "number" and r == 0)
