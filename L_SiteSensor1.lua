@@ -24,7 +24,7 @@ local idata = {} -- per-instance data
 
 local isALTUI = false
 local isOpenLuup = false
-local debugMode = false
+local debugMode = true
 
 local https = require("ssl.https")
 local http = require("socket.http")
@@ -673,6 +673,69 @@ function disarm(dev)
         luup.variable_set(SSSID, "Armed", "0", dev)
     end
     luup.variable_set(SSSID, "ArmedTripped", "0", dev)
+end
+
+function requestHandler(lul_request, lul_parameters, lul_outputformat)
+    D("requestHandler(%1,%2,%3) luup.device=%4", lul_request, lul_parameters, lul_outputformat, luup.device)
+    local cmd = lul_parameters["command"] or ""
+    if cmd == "ISS" then
+debugMode = true -- force if ISS is used    
+        -- ImperiHome ISS Standard System API, see http://dev.evertygo.com/api/iss#types
+        local dkjson = require('dkjson')
+        local path = lul_parameters['path'] or "/devices"
+        if path == "/system" then
+            return dkjson.encode( { id="SiteSensor-" .. luup.pk_accesspoint, apiversion=1 } ), "application/json"
+        elseif path == "/rooms" then
+            local roomlist = { { id=0, name="No Room" } }
+            local rn,rr
+            for rn,rr in pairs( luup.rooms ) do 
+                table.insert( roomlist, { id=rn, name=rr } )
+            end
+            return dkjson.encode( { rooms=roomlist } ), "application/json"
+        elseif path == "/devices" then
+            local devices = {}
+            local lnum,ldev
+            for lnum,ldev in pairs( luup.devices ) do
+                if ldev.device_type == MYTYPE then
+                    local dev = { id=tostring(lnum),
+                        name=ldev.description or ("#" .. lnum),
+                        ["type"]="DevDoor",
+                        defaultIcon=nil,
+                        params={
+                            { key="armable", value="1" },
+                            { key="ackable", value="0" },
+                            { key="Armed", value=luup.variable_get( SSSID, "Armed", lnum) or "0" },
+                            { key="Tripped", value=luup.variable_get( SSSID, "Tripped", lnum ) or "0" },
+                            { key="lasttrip", value=luup.variable_get( SSSID, "LastTrip", lnum ) or "0" }
+                        }
+                    }
+                    if (ldev.room_num or 0) ~= 0 then dev.room = tostring(ldev.room_num) end
+                    table.insert( devices, dev )
+                    
+                    -- Make a device for each formula that stores a value (if any). Skip empties.
+                    local k
+                    for k = 1,8 do
+                        local frm = luup.variable_get( MYSID, "Expr" .. k, lnum ) or ""
+                        if frm ~= "" then
+                            dev = { id=string.format("%d-%d", lnum, k),
+                                name=(ldev.description or ("#" .. lnum)) .. "-" .. k,
+                                ["type"]="DevGenericSensor",
+                                defaultIcon=nil,
+                                params={
+                                    { key="Value", value=luup.variable_get(MYSID, "Value" .. k, lnum) or "" }
+                                }
+                            }
+                            if (ldev.room_num or 0) ~= 0 then dev.room = tostring(ldev.room_num) end
+                            table.insert( devices, dev )
+                        end
+                    end
+                end
+            end
+            return dkjson.encode( { devices=devices } ), "application/json"
+        else
+            D("requestHandler: command %1 not implemented, ignored", cmd)
+        end
+    end
 end
 
 function init(dev)
