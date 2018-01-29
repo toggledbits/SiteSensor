@@ -45,66 +45,6 @@ local MAXPREC = 99 -- value doesn't matter as long as it's >= any used in binops
 
 local charmap = { t = "\t", r = "\r", n = "\n" }
 
-local function pow(b, x)
-    return math.exp(x * math.log(b))
-end
-
-local function select(obj, keyname, keyval)
-    local i,v
-    for i,v in pairs(obj) do
-        if v[keyname] == keyval then
-            return v
-        end
-    end
-    return nil
-end
-
-local nativeFuncs = {
-      ['abs']   = { nargs = 1, impl = function( argv ) if argv[1] < 0 then return -argv[1] else return argv[1] end end }
-    , ['sgn']   = { nargs = 1, impl = function( argv ) if argv[1] < 0 then return -1 elseif (argv[1] == 0) then return 0 else return 1 end end }
-    , ['floor'] = { nargs = 1, impl = function( argv ) return math.floor(argv[1]) end }
-    , ['ceil']  = { nargs = 1, impl = function( argv ) return math.ceil(argv[1]) end }
-    , ['round'] = { nargs = 1, impl = function( argv ) local n = argv[1] local p = argv[2] or 0 return math.floor( n * pow(10, p) + 0.5 ) / pow(10, p) end }
-    , ['cos']   = { nargs = 1, impl = function( argv ) return math.cos(argv[1]) end }
-    , ['sin']   = { nargs = 1, impl = function( argv ) return math.sin(argv[1]) end }
-    , ['tan']   = { nargs = 1, impl = function( argv ) return math.tan(argv[1]) end }
-    , ['log']   = { nargs = 1, impl = function( argv ) return math.log(argv[1]) end }
-    , ['exp']   = { nargs = 1, impl = function( argv ) return math.exp(argv[1]) end }
-    , ['pow']   = { nargs = 2, impl = function( argv ) return pow(argv[1], argv[2]) end }
-    , ['sqrt']  = { nargs = 1, impl = function( argv ) return math.sqrt( argv[1] ) end }
-    , ['min']   = { nargs = 2, impl = function( argv ) if argv[1] <= argv[2] then return argv[1] else return argv[2] end end }
-    , ['max']   = { nargs = 2, impl = function( argv ) if argv[1] >= argv[2] then return argv[1] else return argv[2] end end }
-    , ['len']   = { nargs = 1, impl = function( argv ) return string.len(tostring(argv[1])) end }
-    , ['sub']   = { nargs = 2, impl = function( argv ) local st = tostring(argv[1]) local p = argv[2] local l = argv[3] or -1 return string.sub(st, p, l) end }
-    , ['find']  = { nargs = 2, impl = function( argv ) local st = tostring(argv[1]) local p = tostring(argv[2]) local i = argv[3] or 1 return string.find(st, p, i) end }
-    , ['upper'] = { nargs = 1, impl = function( argv ) return string.upper(tostring(argv[1])) end }
-    , ['lower'] =  { nargs = 1, impl = function( argv ) return string.lower(tostring(argv[1])) end }
-    , ['tonumber'] = { nargs = 1, impl = function( argv ) return tonumber(argv[1], argv[2] or 10) end }
-    , ['time']  = { nargs = 0, impl = function() return os.time() end }
-    , ['choose'] = { nargs = 2, impl = function( argv ) local ix = argv[1] if ix < 1 or ix > (#argv-2) then return argv[2] else return argv[ix+2] end end }
-    , ['select'] = { nargs = 3, impl = function( argv ) return select(argv[1],argv[2],argv[3]) end }
-    , ['strftime'] = { nargs = 1, impl = function( argv ) return os.date(unpack(argv)) end }
-}
-
--- Adapted from "BitUtils", Lua-users wiki at http://lua-users.org/wiki/BitUtils; thank you kind stranger(s)...
-local bit = {}
-bit['nand'] = function(x,y,z)
-    z=z or 2^16
-    if z<2 then
-        return 1-x*y
-    else
-        return bit.nand((x-x%z)/z,(y-y%z)/z,math.sqrt(z))*z+bit.nand(x%z,y%z,math.sqrt(z))
-    end
-end
-bit["bnot"]=function(y,z) return bit.nand(bit.nand(0,0,z),y,z) end
-bit["band"]=function(x,y,z) return bit.nand(bit["bnot"](0,z),bit.nand(x,y,z),z) end
-bit["bor"]=function(x,y,z) return bit.nand(bit["bnot"](x,z),bit["bnot"](y,z),z) end
-bit["bxor"]=function(x,y,z) return bit["band"](bit.nand(x,y,z),bit["bor"](x,y,z),z) end
-
--- Forward declarations
-local _comp
-local scan_token
-
 -- Utility functions
 
 function debug(s)
@@ -129,6 +69,332 @@ function dump(t)
     end
     return st
 end
+
+local function xp_pow(b, x)
+    return math.exp(x * math.log(b))
+end
+
+local function xp_select(obj, keyname, keyval)
+    local i,v
+    for i,v in pairs(obj) do
+        if v[keyname] == keyval then
+            return v
+        end
+    end
+    return nil
+end
+
+local monthNameMap = {}
+local function mapLocaleMonth( m )
+    local k
+    if m == nil then error("Nil month name") end
+    local ml = string.lower(tostring(m))
+    if ml:match("^%d+$") then
+        -- All numeric. Simply return numeric form if valid range.
+        k = tonumber(ml) or 0
+        if k >=1 and k <= 12 then return k end
+    end
+    if monthNameMap[ml] ~= nil then -- cached result?
+        debug("mapLocaleMonth(" .. ml .. ") cached result=" .. monthNameMap[ml])
+        return monthNameMap[ml]
+    end
+    -- Since we can't get locale information directly in a platform-independent way,
+    -- deduce it from live results...
+    local d = os.date("*t") -- current time and date
+    d.day = 1 -- pinned
+    for k = 1,12 do
+        d.month = k
+        local tt = os.time(d)
+        local s = os.date("#%b#%B#", tt):lower()
+        if s:find("#"..ml.."#") then
+            monthNameMap[ml] = k
+            return k 
+        end
+    end
+    return error("Cannot parse month name '" .. m .. "'")
+end
+
+local YMD=0
+local DMY=1
+local MDY=2
+local function guessMDDM()
+    local d = os.date( "%x", os.time( { year=2001, month=8, day=22, hour=0 } ) )
+    local p = { d:match("(%d+)([/-])(%d+)[/-](%d+)") }
+    if p[1] == "2001" then return YMD,p[2]
+    elseif tonumber(p[1]) == 22 then return DMY,p[2]
+    else return MDY,p[2] end
+end
+    
+-- Somewhat simple time parsing. Handles the most common forms of ISO 8601, plus many less regular forms.
+-- If mm/dd vs dd/mm is ambiguous, it tries to discern using current locale's rule.
+local function xp_parse_time( t )
+    if type(t) == "number" then return t end -- if already numeric, assume it's already timestamp
+    if t == nil or tostring(t):lower() == "now" then return os.time() end
+    t = tostring(t) -- force string
+    local now = os.time()
+    local nd = os.date("*t", now) -- consistent
+    local tt = { year=nd.year, month=nd.month, day=nd.day, hour=0, ['min']=0, sec=0 }
+    local offset = 0
+    -- Try to match a date. Start with two components.
+    local order = nil
+    local p = { t:match("^%s*(%d+)([/-])(%d+)(.*)") } -- entirely numeric w/sep
+    if p[3] == nil then debug("match 2") p = { t:match("^%s*(%d+)(%-)(%a+)(.*)") } order=DMY end -- number-word (4-Jul)
+    if p[3] == nil then debug("match 3") p = { t:match("^%s*(%a+)(%-)(%d+)(.*)") } order=MDY end -- word-number (Jul-4) 
+    if p[3] ~= nil then 
+        -- Look ahead for third component behind same separator
+        debug(string.format("Found p1=%s, p2=%s, sep=%s, rem=%s", p[1], p[2], p[3], p[4]))
+        local sep = p[2]
+        t = p[4] or ""
+        debug(string.format("Scanning for 3rd part from: '%s'", t))
+        p[4],p[5] = t:match("^%" .. sep .. "(%d+)(.*)")
+        if p[4] == nil then 
+            p[4] = tt.year
+        else
+            t = p[5] or "" -- advance token
+        end
+        -- We now have three components. Figure out their order.
+        p[5]=t p[6]=p[6]or"" debug(string.format("p=%s,%s,%s,%s,%s", unpack(p)))
+        local first = tonumber(p[1]) or 0
+        if order == nil and first > 31 then
+            -- First is year (can't be month or day), assume y/m/d
+            tt.year = first
+            tt.month = mapLocaleMonth(p[3])
+            tt.day = p[4]
+        elseif order == nil and first > 12 then
+            -- First is day, assume d/m/y
+            tt.day = first
+            tt.month = mapLocaleMonth(p[3])
+            tt.year = p[4]
+        else
+            -- Guess using locale formatting
+            if order == nil then
+                debug("Guessing MDY order")
+                order = guessMDDM()
+            end
+            debug("MDY order is " .. order)
+            if order == 0 then 
+                tt.year = p[1] tt.month = mapLocaleMonth(p[3]) tt.day = p[4]
+            elseif order == 1 then
+                tt.day = p[1] tt.month = mapLocaleMonth(p[3]) tt.year = p[4]
+            else
+                tt.month = mapLocaleMonth(p[1]) tt.day = p[3] tt.year = p[4]
+            end
+        end
+        tt.year = tonumber(tt.year)
+        if tt.year < 100 then tt.year = tt.year + 2000 end
+        debug(string.format("Parsed date year=%s, month=%s, day=%s", tostring(tt.year), tostring(tt.month), tostring(tt.day)))
+    else
+        -- YYYYMMDD?
+        debug("No match to delimited")
+        p = { t:match("^%s*(%d%d%d%d)(%d%d)(%d%d)(.*)") }
+        if p[3] ~= nil then
+            tt.year = p[1]
+            tt.month = p[2]
+            tt.day = p[3]
+            t = p[4] or ""
+        else
+            debug("check %%c format")
+            -- Fri Aug  4 16:18:22 2017
+            p = { t:match("^%s*%a+%s+(%a+)%s+(%d+)(.*)") } -- with dow
+            if p[2] == nil then p = { t:match("^%s*(%a+)%s+(%d+)(.*)") } end -- without dow
+            if p[2] ~= nil then
+                debug(string.format("Matches %%c format, 1=%s,2=%s,3=%s", p[1], p[2], p[3]))
+                tt.day = p[2]
+                tt.month = mapLocaleMonth(p[1])
+                t = p[3] or ""
+                -- Following time and year?
+                p = { t:match("^%s*([%d:]+)%s+(%d%d%d%d)(.*)") }
+                if p[1] ~= nil then
+                    tt.year = p[2]
+                    t = (p[1] or "") .. " " .. (p[3] or "")
+                else
+                    -- Maybe just year?
+                    p = { t:match("^%s*(%d%d%d%d)(.*)") }
+                    if p[1] ~= nil then
+                        tt.year = p[1]
+                        t = p[2] or ""
+                    end
+                end
+            else 
+                debug("No luck with any known date format.")
+            end
+        end
+        debug(string.format("Parsed date year=%s, month=%s, day=%s", tostring(tt.year), tostring(tt.month), tostring(tt.day)))
+    end
+    -- Time? Note: does not support decimal fractions except on seconds component, which is ignored (ISO 8601 allows on any, but must be last component)
+    debug(string.format("Scanning for time from: '%s'", t))
+    local hasTZ = false
+    local sep = nil
+    p = { t:match("^%s*T?(%d%d)(%d%d)(.*)") } -- ISO 8601 (Thhmm) without delimiters
+    if p[1] == nil then p = { t:match("^%s*T?(%d+):(%d+)(.*)") } end -- with delimiters
+    if p[1] ~= nil then
+        -- Hour and minute
+        tt.hour = p[1]
+        tt['min'] = p[2]
+        t = p[3] or ""
+        -- Seconds?
+        p = { t:match("^:?(%d+)(.*)") }
+        if p[1] ~= nil then
+            tt.sec = p[1]
+            t = p[2] or ""
+        end
+        -- Swallow decimal on last component?
+        p = { t:match("^(%.%d+)(.*)") }
+        if p[1] ~= nil then
+            t = p[2] or ""
+        end
+        -- AM or PM?
+        p = { t:match("^%s*([AaPp])[Mm]?(.*)") }
+        if p[1] ~= nil then
+            debug("AM/PM is " .. p[1])
+            if p[1]:lower() == "p" then tt.hour = tt.hour + 12 end
+            t = p[2] or ""
+        end
+        debug(string.format("Parsed time is %s:%s:%s", tt.hour, tt['min'], tt.sec))
+        
+        -- Timezone Zulu?
+        p = { t:match("^([zZ])(.*)") } -- no whitespace, see comment below.
+        if p[1] ~= nil then
+            -- Zulu
+            offset = 0
+            hasTZ = true
+            t = p[2] or ""
+        end
+        -- Handling for zones? UTC, GMT, minimally... what about others... EDT, JST, ...?
+        -- Offset +/-HH[mm] (e.g. +02, -0500). Not that the pattern requires the TZ spec 
+        -- to follow the time without spaces between, to distinguish TZ from offsets (below).
+        p = { t:match("^([+-]%d%d)(.*)") }
+        if p[1] ~= nil then
+            hasTZ = true
+            offset = 60 * tonumber(p[1])
+            t = p[2];
+            p = { t:match("^:?(%d%d)(.*)") }
+            if p[1] ~= nil then
+                if offset < 0 then offset = offset - tonumber(p[1])
+                else offset = offset + tonumber(p[1]) 
+                end
+                t = p[2] or ""
+            end
+        end
+    end
+    -- Is there an offset? Form is (+/-)DDD:HH:MM:SS. If parts are omitted, the offset
+    -- is parsed from smallest to largest, so +05:00 is +5 minutes, -35 is minus 35 seconds.
+    local delta = 0
+    debug("Checking for offset from '" .. t .. "'")
+    p = { t:match("%s*([+-])(%d+)(.*)") }
+    if p[2] ~= nil then
+        debug("Parsing offset from " .. t .. ", first part is " .. p[2])
+        local sign = p[1]
+        delta = tonumber(p[2]) or error("Invalid delta spec: " .. t)
+        t = p[3] or ""
+        local k
+        for k = 1,3 do
+            debug("Parsing offset from " .. t)
+            p = { t:match("%:(%d+)(.*)") }
+            if p[1] == nil then break end
+            if k == 3 then delta = delta * 24 else delta = delta * 60 end
+            delta = delta + tonumber(p[1])
+            t = p[2] or ""
+        end
+        if sign == "-" then delta = -delta end
+        debug("Final delta is " .. delta)
+    end
+    -- There should not be anything left at this point
+    if t:match("([^%s])") then
+        return error("Unparseable data: " .. t)
+    end
+    local tm = os.time(tt)
+    if hasTZ then
+        -- If there's a timezone spec, apply it. Otherwise we assume time was in current (system) TZ
+        -- and leave it unmodified.
+        local locale_offset = os.time( { year=1970, month=1, day=1, hour=0 } )
+        tm = tm - locale_offset -- back to UTC, because conversion assumes current TZ, so undo that.
+        tm = tm - ( offset * 60 ) -- apply specified offset
+    end
+    tm = tm + delta
+    return tm -- returns time in UTC
+end
+
+-- Date add. First arg is timestamp, then secs, mins, hours, days, months, years
+local function xp_date_add( a ) 
+    local tm = xp_parse_time( a[1] )
+    if a[2] ~= nil then tm = tm + (tonumber(a[2]) or error("Invalid seconds (argument 2) to dateadd()")) end
+    if a[3] ~= nil then tm = tm + 60 * (tonumber(a[3]) or error("Invalid minutes (argument 3) to dateadd()")) end
+    if a[4] ~= nil then tm = tm + 3600 * (tonumber(a[4]) or error("Invalid hours (argument 4) to dateadd()")) end
+    if a[5] ~= nil then tm = tm + 86400 * (tonumber(a[5]) or error("Invalid days (argument 5) to dateadd()")) end
+    if a[6] ~= nil or a[7] ~= nil then
+        debug("Applying delta months and years to " .. tm)
+        local d = os.date("*t", tm)
+        d.month = d.month + ( tonumber( a[6] ) or 0 )
+        d.year = d.year + ( tonumber( a[7] ) or 0 )
+        debug(string.format("Normalizing month,year=%d,%d", d.month, d.year))
+        while d.month < 1 do
+            d.month = d.month + 12
+            d.year = d.year - 1
+        end
+        while d.month > 12 do
+            d.month = d.month - 12
+            d.year = d.year + 1
+        end
+        tm = os.time(d)
+    end
+    return tm
+end
+
+-- Delta between two times. Returns value in seconds.
+local function xp_date_diff( d1, d2 )
+    return xp_parse_time( d1 ) - xp_parse_time( d2 or os.time() )
+end
+
+local nativeFuncs = {
+      ['abs']   = { nargs = 1, impl = function( argv ) if argv[1] < 0 then return -argv[1] else return argv[1] end end }
+    , ['sgn']   = { nargs = 1, impl = function( argv ) if argv[1] < 0 then return -1 elseif (argv[1] == 0) then return 0 else return 1 end end }
+    , ['floor'] = { nargs = 1, impl = function( argv ) return math.floor(argv[1]) end }
+    , ['ceil']  = { nargs = 1, impl = function( argv ) return math.ceil(argv[1]) end }
+    , ['round'] = { nargs = 1, impl = function( argv ) local n = argv[1] local p = argv[2] or 0 return math.floor( n * pow(10, p) + 0.5 ) / pow(10, p) end }
+    , ['cos']   = { nargs = 1, impl = function( argv ) return math.cos(argv[1]) end }
+    , ['sin']   = { nargs = 1, impl = function( argv ) return math.sin(argv[1]) end }
+    , ['tan']   = { nargs = 1, impl = function( argv ) return math.tan(argv[1]) end }
+    , ['log']   = { nargs = 1, impl = function( argv ) return math.log(argv[1]) end }
+    , ['exp']   = { nargs = 1, impl = function( argv ) return math.exp(argv[1]) end }
+    , ['pow']   = { nargs = 2, impl = function( argv ) return xp_pow(argv[1], argv[2]) end }
+    , ['sqrt']  = { nargs = 1, impl = function( argv ) return math.sqrt( argv[1] ) end }
+    , ['min']   = { nargs = 2, impl = function( argv ) if argv[1] <= argv[2] then return argv[1] else return argv[2] end end }
+    , ['max']   = { nargs = 2, impl = function( argv ) if argv[1] >= argv[2] then return argv[1] else return argv[2] end end }
+    , ['len']   = { nargs = 1, impl = function( argv ) return string.len(tostring(argv[1])) end }
+    , ['sub']   = { nargs = 2, impl = function( argv ) local st = tostring(argv[1]) local p = argv[2] local l = argv[3] or -1 return string.sub(st, p, l) end }
+    , ['find']  = { nargs = 2, impl = function( argv ) local st = tostring(argv[1]) local p = tostring(argv[2]) local i = argv[3] or 1 return string.find(st, p, i) end }
+    , ['upper'] = { nargs = 1, impl = function( argv ) return string.upper(tostring(argv[1])) end }
+    , ['lower'] =  { nargs = 1, impl = function( argv ) return string.lower(tostring(argv[1])) end }
+    , ['tostring'] = { nargs = 1, impl = function( argv ) return tostring(argv[1]) end }
+    , ['tonumber'] = { nargs = 1, impl = function( argv ) return tonumber(argv[1], argv[2] or 10) end }
+    , ['time']  = { nargs = 0, impl = function( argv ) return xp_parse_time( argv[1] ) end }
+    , ['choose'] = { nargs = 2, impl = function( argv ) local ix = argv[1] if ix < 1 or ix > (#argv-2) then return argv[2] else return argv[ix+2] end end }
+    , ['select'] = { nargs = 3, impl = function( argv ) return xp_select(argv[1],argv[2],argv[3]) end }
+    , ['strftime'] = { nargs = 1, impl = function( argv ) return os.date(unpack(argv)) end }
+    , ['dateadd'] = { nargs = 2, impl = function( argv ) return xp_date_add( argv ) end }
+    , ['datediff'] = { nargs = 1, impl = function( argv ) return xp_date_diff( argv[1], argv[2] or os.time() ) end }
+    , ['format'] = { nargs = 1, impl = function( argv ) return string.format( unpack(argv) ) end }
+}
+
+-- Adapted from "BitUtils", Lua-users wiki at http://lua-users.org/wiki/BitUtils; thank you kind stranger(s)...
+local bit = {}
+bit['nand'] = function(x,y,z)
+    z=z or 2^16
+    if z<2 then
+        return 1-x*y
+    else
+        return bit.nand((x-x%z)/z,(y-y%z)/z,math.sqrt(z))*z+bit.nand(x%z,y%z,math.sqrt(z))
+    end
+end
+bit["bnot"]=function(y,z) return bit.nand(bit.nand(0,0,z),y,z) end
+bit["band"]=function(x,y,z) return bit.nand(bit["bnot"](0,z),bit.nand(x,y,z),z) end
+bit["bor"]=function(x,y,z) return bit.nand(bit["bnot"](x,z),bit["bnot"](y,z),z) end
+bit["bxor"]=function(x,y,z) return bit["band"](bit.nand(x,y,z),bit["bor"](x,y,z),z) end
+
+-- Forward declarations
+local _comp
+local scan_token
 
 -- Let's get to work
 
@@ -269,6 +535,11 @@ local function scan_fref( expr, index, name )
                 subexp = subexp .. ch
                 index = index + 1
             end
+        elseif ch == "'" or ch == '"' then
+            -- Start of string? Swallow it whole and append it to our subexpression
+            local qq = ch
+            index, ch = scan_string( expr, index )
+            subexp = subexp .. qq .. ch .. qq
         elseif (ch == ',' and parenLevel == 1) then -- completed subexpression
             debug("scan_fref: handling argument=" .. subexp)
             if (string.len(subexp) > 0) then
@@ -766,7 +1037,7 @@ local function _run( ce, ctx, stack )
             local status
             status, v = pcall(impl, argv)
             debug("_run: finished " .. e.name .. "() call, status=" .. tostring(status) .. ", result=" .. dump(v))
-            if (not status) then error("Execution of function " .. e.name .. " returned an error: " .. tostring(v), 0) end
+            if (not status) then error("Execution of function " .. e.name .. "() returned an error: " .. tostring(v), 0) end
         elseif (e.type == VREF) then
             debug("_run: handling vref, name=" .. e.name)
             local isLook = false
