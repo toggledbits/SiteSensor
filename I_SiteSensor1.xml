@@ -54,6 +54,14 @@
             </run>
         </action>
         <action>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <name>LogRequests</name>
+            <run>
+                local enabled = tonumber( lul_settings.Enabled ) or 0
+                luup.variable_set("urn:toggledbits-com:serviceId:SiteSensor1", "LogRequests", enabled, lul_device)
+            </run>
+        </action>
+        <action>
             <serviceId>urn:micasaverde-com:serviceId:SecuritySensor1</serviceId>
             <name>SetArmed</name>
             <run>
