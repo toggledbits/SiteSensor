@@ -484,30 +484,10 @@ local function doJSONQuery(dev)
     -- Since we got a valid response, indicate not tripped, unless using TripExpression, then that.
     -- Reset state var for (in)valid response?
     setMessage("Processing response...", dev)
-    if ttype == "expr" then
-        D("doJSONQuery() parsing TripExpression %1", texp)
-        local r = nil
-        if texp ~= nil then r = parseRefExpr(texp, ctx) end
-        D("doJSONQuery() TripExpression result is %1", r)
-        if r == nil
-            or (type(r) == "boolean" and r == false)
-            or (type(r) == "number" and r == 0)
-            or (type(r) == "string" and string.len(r) == 0)
-        then
-            -- Trip expression is logically (for us) false
-            trip(false, dev)
-        else
-            -- Trip expression is not logically false (i.e. true)
-            trip(true, dev)
-        end
-    else
-        -- No trip expression; trip state follows query success
-        D("doJSONQuery() resetting tripped state")
-        trip(ctx.status.valid == 0, dev)
-    end
-
+    
     -- Valid response. Let's parse it and set our variables.
     local i
+    ctx.expr = {}
     for i = 1,8 do
         local r = nil
         local ex = luup.variable_get(MYSID, "Expr" .. tostring(i), dev)
@@ -531,6 +511,7 @@ local function doJSONQuery(dev)
         end
 
         -- Save if changed.
+        ctx.expr[i] = r
         local oldVal = luup.variable_get(MYSID, "Value" .. tostring(i), dev)
         D("doJSONQuery() newval=%1, oldVal=%2", r, oldVal)
         if r ~= oldVal then
@@ -538,6 +519,29 @@ local function doJSONQuery(dev)
             D("doJSONQuery() Expr%1 value changed, was %2 now %3", i, oldVal, r)
             luup.variable_set(MYSID, "Value" .. tostring(i), tostring(r), dev)
         end
+    end
+
+    -- Handle the trip expression
+    if ttype == "expr" then
+        D("doJSONQuery() parsing TripExpression %1", texp)
+        local r = nil
+        if texp ~= nil then r = parseRefExpr(texp, ctx) end
+        D("doJSONQuery() TripExpression result is %1", r)
+        if r == nil
+            or (type(r) == "boolean" and r == false)
+            or (type(r) == "number" and r == 0)
+            or (type(r) == "string" and string.len(r) == 0)
+        then
+            -- Trip expression is logically (for us) false
+            trip(false, dev)
+        else
+            -- Trip expression is not logically false (i.e. true)
+            trip(true, dev)
+        end
+    else
+        -- No trip expression; trip state follows query success
+        D("doJSONQuery() resetting tripped state")
+        trip(ctx.status.valid == 0, dev)
     end
 
     local msg
