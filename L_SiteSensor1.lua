@@ -24,7 +24,7 @@ local idata = {} -- per-instance data
 
 local isALTUI = false
 local isOpenLuup = false
-local debugMode = true
+local debugMode = false
 
 local https = require("ssl.https")
 local http = require("socket.http")
@@ -678,8 +678,11 @@ end
 function requestHandler(lul_request, lul_parameters, lul_outputformat)
     D("requestHandler(%1,%2,%3) luup.device=%4", lul_request, lul_parameters, lul_outputformat, luup.device)
     local cmd = lul_parameters["command"] or ""
+    if cmd == "debug" then
+        debugMode = true
+        return "OK (" .. tostring(debugMode) .. ")", "text/plain"
+    end
     if cmd == "ISS" then
-debugMode = true -- force if ISS is used    
         -- ImperiHome ISS Standard System API, see http://dev.evertygo.com/api/iss#types
         local dkjson = require('dkjson')
         local path = lul_parameters['path'] or "/devices"
