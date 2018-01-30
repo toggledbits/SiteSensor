@@ -45,7 +45,7 @@ local MAXPREC = 99 -- value doesn't matter as long as it's >= any used in binops
 
 local charmap = { t = "\t", r = "\r", n = "\n" }
 
--- Utility functions
+local reservedWords = { ['false']=false, ['true']=true, pi=3.14159265 }
 
 function debug(s)
     if (_DEBUG) then print(s) end
@@ -351,7 +351,7 @@ local nativeFuncs = {
     , ['sgn']   = { nargs = 1, impl = function( argv ) if argv[1] < 0 then return -1 elseif (argv[1] == 0) then return 0 else return 1 end end }
     , ['floor'] = { nargs = 1, impl = function( argv ) return math.floor(argv[1]) end }
     , ['ceil']  = { nargs = 1, impl = function( argv ) return math.ceil(argv[1]) end }
-    , ['round'] = { nargs = 1, impl = function( argv ) local n = argv[1] local p = argv[2] or 0 return math.floor( n * pow(10, p) + 0.5 ) / pow(10, p) end }
+    , ['round'] = { nargs = 1, impl = function( argv ) local n = argv[1] local p = argv[2] or 0 return math.floor( n * xp_pow(10, p) + 0.5 ) / xp_pow(10, p) end }
     , ['cos']   = { nargs = 1, impl = function( argv ) return math.cos(argv[1]) end }
     , ['sin']   = { nargs = 1, impl = function( argv ) return math.sin(argv[1]) end }
     , ['tan']   = { nargs = 1, impl = function( argv ) return math.tan(argv[1]) end }
@@ -455,25 +455,35 @@ local function scan_numeric( expr, index )
         index = index + 1 -- get past decimal point
         while (index <= len) do
             ch = string.sub(expr, index, index)
-            i = string.find("0123456789", ch, 1, true)
-            if (i == nil) then break end
-            ndec = ndec - 1
-            val = val + (i-1) * pow(10, ndec)
+            i = string.byte(ch) - 48
+            if i<0 or i>9 then break end
+            ndec = ndec + 1
+            val = val + ( i * xp_pow( 10, -ndec ) )
             index = index + 1
         end
     end
     -- Parse exponent, if any
     if ( (ch == 'e' or ch == 'E') and base == 10 ) then
         local npow = 0
+        local neg = nil
         index = index + 1 -- get base exponent marker
+        local st = index
         while (index <= len) do
             ch = string.sub(expr, index, index)
-            i = string.find("0123456789", ch, 1, true)
-            if (i == nil) then break end
-            npow = npow * 10 + (i-1)
+            if neg == nil and ch == "-" then neg = true
+            elseif neg == nil and ch == "+" then neg = false
+            else 
+                i = string.byte(ch) - 48
+                if i<0 or i>9 then break end
+                npow = npow * 10 + i
+                if neg == nil then neg = false end
+            end
             index = index + 1
         end
-        val = val * pow(10,npow)
+        
+        if index == st then error("Missing exponent at " .. index) end
+        if neg then npow = -npow end
+        val = val * xp_pow( 10, npow )
     end
     -- Return result
     debug("scan_numeric returning index=" .. index .. ", val=" .. val)
@@ -907,28 +917,22 @@ local function _run( ce, ctx, stack )
                 check_operand_type(v2, "number")
                 v = v1 % v2
             elseif (e.op == '&') then
-                if base.type(v1) == "boolean" or base.type(v2) == "boolean" then
-                    v = coerce(v1, "boolean") and coerce(v2, "boolean")
+                if base.type(v1) == "number" or base.type(v2) == "number" then
+                    v = bit.band( coerce(v1, "number"), coerce(v2, "number") )
                 else
-                    check_operand_type(v1, "number")
-                    check_operand_type(v2, "number")
-                    v = bit.band(v1, v2)
+                    v = coerce(v1, "boolean") and coerce(v2, "boolean")
                 end
             elseif (e.op == '|') then
-                if base.type(v1) == "boolean" or base.type(v2) == "boolean" then
-                    v = coerce(v1, "boolean") or coerce(v2, "boolean")
+                if base.type(v1) == "number" or base.type(v2) == "number" then
+                    v = bit.bor( coerce(v1, "number"), coerce(v2, "number") )
                 else
-                    check_operand_type(v1, "number")
-                    check_operand_type(v2, "number")
-                    v = bit.bor(v1, v2)
+                    v = coerce(v1, "boolean") or coerce(v2, "boolean")
                 end
             elseif (e.op == '^') then
-                if base.type(v1) == "boolean" or base.type(v2) == "boolean" then
-                    v = coerce(v1, "boolean") ~= coerce(v2, "boolean") 
+                if base.type(v1) == "number" or base.type(v2) == "number" then
+                    v = bit.bxor( coerce(v1, "number"), coerce(v2, "number") )
                 else
-                    check_operand_type(v1, "number")
-                    check_operand_type(v2, "number")
-                    v = bit.bxor(v1, v2)
+                    v = coerce(v1, "boolean") ~= coerce(v2, "boolean")
                 end
             elseif (e.op == '<') then
                 check_operand_type(v1, {"number","string"})
@@ -1055,7 +1059,11 @@ local function _run( ce, ctx, stack )
             end
             if not isLook then
                 -- v = resolve(e.name, ctx)
-                v = ctx[e.name]
+                if reservedWords[e.name:lower()] ~= nil then
+                    v = reservedWords[e.name:lower()]
+                else
+                    v = ctx[e.name]
+                end
                 if (v == nil) then error("Undefined variable: " .. e.name, 0) end
             end
             -- Apply array index if present
