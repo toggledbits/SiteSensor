@@ -924,7 +924,7 @@ local function _run( ce, ctx, stack )
                 end
             elseif (e.op == '^') then
                 if base.type(v1) == "boolean" or base.type(v2) == "boolean" then
-                    v = coerce(v1, "boolean") or coerce(v2, "boolean")
+                    v = coerce(v1, "boolean") ~= coerce(v2, "boolean") 
                 else
                     check_operand_type(v1, "number")
                     check_operand_type(v2, "number")
