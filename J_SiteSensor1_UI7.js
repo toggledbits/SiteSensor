@@ -144,7 +144,7 @@ var SiteSensor = (function(api) {
                 var newText = jQuery(this).val();
                 // encode
                 newText = newText.replace(/\s+$/, ""); /* trim */
-                newText = newText.replace(/([|%]|[^[:print:]])/g, function( m ) { return "%" + m.charCodeAt(0).toString(16); } ); /* escape our separator and non-printable */
+                newText = newText.replace(/([|%])/g, function( m ) { return "%" + m.charCodeAt(0).toString(16); } ); /* escape our separator and escape */
                 newText = newText.replace(/\s*(\r|\n|\r\n)/g, "|"); /* Convert newlines to our list breaks */
                 api.setDeviceStatePersistent(myDevice, serviceId, "Headers", newText, 0);
             });
