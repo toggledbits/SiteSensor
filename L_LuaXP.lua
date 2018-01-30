@@ -821,13 +821,13 @@ end
 local function coerce(val, typ)
     local vt = base.type(val)
     debug("coerce: attempt (" .. vt .. ")" .. tostring(val) .. " to (" .. typ .. ")")
-    if vt == typ then return val end
+    if vt == typ then return val end -- already there?
     if typ == "boolean" then
         -- Coerce to boolean
         if vt == "number" then return val ~= 0
         elseif vt == "string" then
-            if string.lower(val) == "true" then return true
-            elseif string.lower(val) == "false" then return false
+            if string.lower(val) == "true" or val == "1" then return true
+            elseif string.lower(val) == "false" or val == "0" then return false
             else return #val ~= 0 -- empty string is false, all else is true
             end
         end
@@ -841,10 +841,10 @@ local function coerce(val, typ)
         elseif vt == "boolean" and not val then return 0
         elseif vt == "string" then
             local n = tonumber(val,10)
-            if n ~= nil then return n else error("Conversion of " .. val .. "from string to number failed", 0) end
+            if n ~= nil then return n else error("Coersion of " .. val .. "from string to number failed", 0) end
         end
     end
-    error("No conversion for " .. vt .. " to " .. typ)
+    error("Can't coerce " .. vt .. " to " .. typ)
 end
 
 local function isNumeric(val)
@@ -977,14 +977,14 @@ local function _run( ce, ctx, stack )
             v = table.remove(stack)
             if (v == nil) then error("Stack underflow in unop eval", 0) end
             if (e.op == '-') then
-                v = v * -1
+                v = -coerce(v, "number")
             elseif (e.op == '+') then
                 -- noop
             elseif (e.op == '!') then
                 if base.type(v) == "boolean" then
                     v = not v
                 else
-                    if v == 0 then v = 1 else v = 0 end
+                    v = not coerce(v, "boolean")
                 end
             elseif e.op == '#' then
                 debug("_run: # unop on " .. tostring(v))
