@@ -555,7 +555,7 @@
 			"id": 2,
 			"label": {
 				"lang_tag": "tb_an_armed_sitesensor_is_not_tripped",
-				"text": "Whenever _DEVICE_NAME_ is armed and not tripped"
+				"text": "Whenever _DEVICE_NAME_ is armed and restores from tripped"
 			},
 			"serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
 			"serviceStateTable": {
@@ -573,7 +573,7 @@
 			"id": 3,
 			"label": {
 				"lang_tag": "tb_sitesensor_is_tripped",
-				"text": "Whenever _DEVICE_NAME_ is tripped whether is armed or disarmed"
+				"text": "Whenever _DEVICE_NAME_ is tripped whether it is armed or disarmed"
 			},
 			"serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
 			"serviceStateTable": {
@@ -587,7 +587,7 @@
 			"id": 4,
 			"label": {
 				"lang_tag": "tb_sitesensor_is_not_tripped",
-				"text": "Whenever _DEVICE_NAME_ is not tripped whether is armed or disarmed"
+				"text": "Whenever _DEVICE_NAME_ restores from tripped whether it is armed or disarmed"
 			},
 			"serviceId": "urn:micasaverde-com:serviceId:SecuritySensor1",
 			"serviceStateTable": {
