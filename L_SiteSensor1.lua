@@ -251,11 +251,23 @@ local function urldecode( str )
     return str:gsub("%%(..)", function( c ) return string.char(tonumber(c,16)) end)
 end   
 
+-- Return the current timezone offset adjusted for DST
+local function tzoffs()
+    local d = os.date("*t")
+    local epoch = { year=1970, month=1, day=1, hour=0 }
+    if d.isdst ~= nil and d.isdst ~= 0 then epoch.isdst = 1 end
+    return os.time( epoch )
+end
+
 local function substitution( str, enc, dev )
     local subMap = {
           isodatetime = function( e ) return os.date("%Y-%m-%dT%H:%M:%S") end
         , isodate = function( e ) return os.date("%Y-%m-%d") end
         , isotime = function( e ) return os.date("%H:%M:%S") end
+          -- tzoffset returns timezone offset in ISO 8601-like format, -0500
+        , tzoffset = function( e, d ) local offs = tzoffs() / 60 local mag = math.abs(offs) local sg = offs < 0 local c = '+' if sg then c = '-' end return string.format("%s%02d%02d", c, mag / 60, mag % 60) end 
+          -- tzdelta returns timezone offset formatted like -5hours (PHP-compatible date offset)
+        , tzrel = function( e, d ) local offs = tzoffs / 60 return string.format("%+dhours", offs / 60) end
         , device = function( e, d ) return d end
         , latitude = function( e ) return luup.latitude end
         , longitude = function( e ) return luup.longitude end
