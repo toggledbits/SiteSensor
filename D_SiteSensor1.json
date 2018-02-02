@@ -624,6 +624,230 @@
 					"comparisson": "="
 				}
 			}
+		},
+		{
+			"id": 7,
+			"label": {
+				"lang_tag": "tb_expr1_bool_false",
+				"text": "Whenever _DEVICE_NAME_ expression value 1 is false"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value1": {
+					"value": "false",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 8,
+			"label": {
+				"lang_tag": "tb_expr1_bool_true",
+				"text": "Whenever _DEVICE_NAME_ expression value 1 is true"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value1": {
+					"value": "true",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 9,
+			"label": {
+				"lang_tag": "tb_expr2_bool_false",
+				"text": "Whenever _DEVICE_NAME_ expression value 2 is false"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value2": {
+					"value": "false",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 10,
+			"label": {
+				"lang_tag": "tb_expr2_bool_true",
+				"text": "Whenever _DEVICE_NAME_ expression value 2 is true"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value2": {
+					"value": "true",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 11,
+			"label": {
+				"lang_tag": "tb_expr3_bool_false",
+				"text": "Whenever _DEVICE_NAME_ expression value 3 is false"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value3": {
+					"value": "false",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 12,
+			"label": {
+				"lang_tag": "tb_expr3_bool_true",
+				"text": "Whenever _DEVICE_NAME_ expression value 3 is true"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value3": {
+					"value": "true",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 13,
+			"label": {
+				"lang_tag": "tb_expr4_bool_false",
+				"text": "Whenever _DEVICE_NAME_ expression value 4 is false"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value4": {
+					"value": "false",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 14,
+			"label": {
+				"lang_tag": "tb_expr4_bool_true",
+				"text": "Whenever _DEVICE_NAME_ expression value 4 is true"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value4": {
+					"value": "true",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 15,
+			"label": {
+				"lang_tag": "tb_expr5_bool_false",
+				"text": "Whenever _DEVICE_NAME_ expression value 5 is false"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value5": {
+					"value": "false",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 16,
+			"label": {
+				"lang_tag": "tb_expr5_bool_true",
+				"text": "Whenever _DEVICE_NAME_ expression value 5 is true"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value5": {
+					"value": "true",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 17,
+			"label": {
+				"lang_tag": "tb_expr6_bool_false",
+				"text": "Whenever _DEVICE_NAME_ expression value 6 is false"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value6": {
+					"value": "false",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 18,
+			"label": {
+				"lang_tag": "tb_expr6_bool_true",
+				"text": "Whenever _DEVICE_NAME_ expression value 6 is true"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value6": {
+					"value": "true",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 19,
+			"label": {
+				"lang_tag": "tb_expr7_bool_false",
+				"text": "Whenever _DEVICE_NAME_ expression value 7 is false"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value7": {
+					"value": "false",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 20,
+			"label": {
+				"lang_tag": "tb_expr7_bool_true",
+				"text": "Whenever _DEVICE_NAME_ expression value 7 is true"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value7": {
+					"value": "true",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 21,
+			"label": {
+				"lang_tag": "tb_expr8_bool_false",
+				"text": "Whenever _DEVICE_NAME_ expression value 8 is false"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value8": {
+					"value": "false",
+					"comparisson": "="
+				}
+			}
+		},
+		{
+			"id": 22,
+			"label": {
+				"lang_tag": "tb_expr8_bool_true",
+				"text": "Whenever _DEVICE_NAME_ expression value 8 is true"
+			},
+			"serviceId": "urn:toggledbits-com:serviceId:SiteSensor1",
+			"serviceStateTable": {
+				"Value8": {
+					"value": "true",
+					"comparisson": "="
+				}
+			}
 		}
 	],
 	"device_type": "urn:schemas-toggledbits-com:device:SiteSensor:1"
