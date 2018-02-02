@@ -1,4 +1,3 @@
-------------------------------------------------------------------------
 -- LuaXP is a simple expression evaluator for Lua, based on lexp.js, a
 -- lightweight (math) expression parser for JavaScript by the same
 -- author.
@@ -8,13 +7,15 @@
 -- Github: https://github.com/toggledbits/luaxp
 ------------------------------------------------------------------------
 
+module("L_LuaXP", package.seeall)
+
 local _M = {}
 
-_M._VERSION = "0.9.4"
-_M._DEBUG = false -- Caller may set boolean true or function(msg)
+_VERSION = "0.9.4"
+_DEBUG = false -- Caller may set boolean true or function(msg)
 
 -- Binary operators and precedence (lower prec is higher precedence)
-_M.binops = {
+binops = {
       { op='.',  prec=-1 }
     , { op='*',  prec= 3 }
     , { op='/',  prec= 3 }
@@ -79,7 +80,7 @@ end
 -- Debug output function. If _DEBUG is false or nil, no output.
 -- If function, uses that, otherwise print()
 local function D(s, ...)
-    if not _M._DEBUG then return end
+    if not _DEBUG then return end
     local str = string.gsub(s, "%%(%d+)", function( n )
             n = tonumber(n, 10)
             if n < 1 or n > #arg then return "nil" end
@@ -92,7 +93,7 @@ local function D(s, ...)
             return tostring(val)
         end
     )
-    if base.type(_M._DEBUG) == "function" then _M._DEBUG(str) else print(str) end
+    if base.type(_DEBUG) == "function" then _DEBUG(str) else print(str) end
 end
 
 -- Forward declarations
@@ -787,7 +788,7 @@ local function scan_binop( expr, index )
         local st = op .. ch
         local matched = false
         k = k + 1
-        for n,f in ipairs(_M.binops) do
+        for n,f in ipairs(binops) do
             if (string.sub(f.op,1,k) == st) then
                 -- matches something
                 matched = true
@@ -1235,7 +1236,7 @@ end
 -- PUBLIC METHODS
 
 -- Compile the expression (public method)
-function _M.compile( expressionString )
+function compile( expressionString )
     local s,v,n
     s,v,n = pcall(_comp, expressionString)
     if (s) then
@@ -1246,7 +1247,7 @@ function _M.compile( expressionString )
 end
 
 -- Public method to execute compiled expression. Accepts a context (ctx)
-function _M.run( compiledExpression, executionContext )
+function run( compiledExpression, executionContext )
     executionContext = executionContext or {}
     if (compiledExpression == nil or compiledExpression.rpn == nil or base.type(compiledExpression.rpn) ~= "table") then return nil end
     local status, val = pcall(_run, compiledExpression.rpn, executionContext)
@@ -1257,24 +1258,15 @@ function _M.run( compiledExpression, executionContext )
     end
 end
 
-function _M.evaluate( expressionString, executionContext )
-    local r,m = _M.compile( expressionString )
+function evaluate( expressionString, executionContext )
+    local r,m = compile( expressionString )
     if (r == nil) then return r,m end -- return error as we got it
-    return _M.run( r, executionContext ) -- and directly return whatever run() wants to return
+    return run( r, executionContext ) -- and directly return whatever run() wants to return
 end
 
 -- Return the error message and approximate location of where a parsing error occurred (if used immediately
 -- after compile(); if used after run(), returns evaluation error (location is meaningless).
-function _M.getLastError( compiledExpression )
+function getLastError( compiledExpression )
     -- Eventually, return the error message and index within the string of where things went wrong
     return "some future error message", 0
 end
-
--- Special exports
-_M.dump = dump
-_M.isNull = isNull
-_M.coerce = coerce
-_M.NULL = NULLATOM
-_M.evalerror = evalerror
-
-return _M
