@@ -253,9 +253,9 @@ end
 
 -- Return the current timezone offset adjusted for DST
 local function tzoffs()
-    local d = os.date("*t")
+    local localtime = os.date("*t")
     local epoch = { year=1970, month=1, day=1, hour=0 }
-    if d.isdst ~= nil and d.isdst ~= 0 then epoch.isdst = 1 end
+    if localtime.isdst then epoch.isdst = true end
     return os.time( epoch )
 end
 
