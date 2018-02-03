@@ -1,3 +1,4 @@
+//# sourceURL=J_SiteSensor1_UI7.js
 var SiteSensor = (function(api) {
 
     // unique identifier for this plugin...
@@ -6,6 +7,8 @@ var SiteSensor = (function(api) {
     var serviceId = "urn:toggledbits-com:serviceId:SiteSensor1";
 
     var myModule = {};
+    
+    var isVisible = false;
 
     function updateResponseFields() {
         var rtype = jQuery('select#rtype').val();
@@ -29,10 +32,10 @@ var SiteSensor = (function(api) {
 
     function onBeforeCpanelClose(args) {
         // console.log('handler for before cpanel close');
+        isVisible = false;
     }
 
     function initPlugin() {
-        api.registerEventHandler('on_ui_cpanel_before_close', myModule, 'onBeforeCpanelClose');
     }
 
     function configurePlugin()
@@ -118,6 +121,12 @@ var SiteSensor = (function(api) {
 
             html += '<p>The JSON data is encapsulated within a "response" key, so if your JSON data looks like the example below, the value <i>errCode</i> would be accessed by the expression <tt>response.errCode</tt>, while the value <i>name</i> would be accessed using <tt>response.type.name</tt>. Refer to the <a href="#">documentation</a> for more details.</p>';
             html += "<code>{\n    \"errCode\": 0,\n    \"type\": {\n        \"name\": \"Normal\",\n        \"class\": \"apiobject\"\n    }\n}</code>";
+            
+            html += "<h2>Options</h2>";
+            html += '<label for="reeval">Re-evaluate the expressions</label>&nbsp;<select id="reeval"><option value="">only immediately after requests (default)</option>';
+            html += '<option value="60">every minute</option>';
+            html += '</select>';
+            html += '<br/>If you have expressions comparing API responses to the current time and date, it is recommended that you re-evaluate them between requests and make your Request Interval longer. This avoids spamming the remote API with requests for data that rarely changes, but still gives you fast response to time-triggered events.';
 
             html += "</div>"; // tb-jsoncontrols
 
@@ -144,7 +153,7 @@ var SiteSensor = (function(api) {
                 var newText = jQuery(this).val();
                 // encode
                 newText = newText.replace(/\s+$/, ""); /* trim */
-                newText = newText.replace(/([|%]|[^[:print:]])/g, function( m ) { return "%" + m.charCodeAt(0).toString(16); } ); /* escape our separator and non-printable */
+                newText = newText.replace(/([|%])/g, function( m ) { return "%" + m.charCodeAt(0).toString(16); } ); /* escape our separator and escape */
                 newText = newText.replace(/\s*(\r|\n|\r\n)/g, "|"); /* Convert newlines to our list breaks */
                 api.setDeviceStatePersistent(myDevice, serviceId, "Headers", newText, 0);
             });
@@ -204,6 +213,21 @@ var SiteSensor = (function(api) {
                 var newExpr = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "TripExpression", newExpr, 0);
             });
+            
+            s = api.getDeviceState(myDevice, serviceId, "EvalInterval");
+            if (s) {
+                // If the currently selected option isn't on the list, add it, so we don't lose it.
+                var el = jQuery('select#reeval option[value="' + s + '"]');
+                if ( el.length == 0 ) {
+                    jQuery('select#reeval').append($('<option>', { value: s }).text('Every ' + s + ' seconds (custom)').prop('selected', true));
+                } else {
+                    el.prop('selected', true);
+                }
+            }
+            jQuery("select#reeval").change( function( obj ) {
+                var newVal = jQuery(this).val();
+                api.setDeviceStatePersistent(myDevice, serviceId, "EvalInterval", newVal, 0);
+            });
 
             $('input.jsonexpr').each( function( obj ) {
                 var ix = $(this).attr('id').substr(4);
@@ -223,12 +247,80 @@ var SiteSensor = (function(api) {
             Utils.logError('Error in SiteSensor.configurePlugin(): ' + e);
         }
     }
+    
+    function ipath( i ) {
+        return 'https://www.toggledbits.com/sitesensor/img/' + i + '.png';
+    }
+    
+    function itag( i ) {
+        var id = i.replace(/-(off|on)$/i, "");
+        return '<img src="' + ipath( i ) + '" id="' + id + '" alt="' + id + '">';
+    }
+    
+    function updateIndicators() {
+        var devNum = api.getCpanelDeviceId();
+
+        // Set up defaults and (re)actions
+        var st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "Failed");
+        jQuery("div#sitesensor-status img#status-indicator-caution").attr('src', st == "0" ? ipath("status-indicator-caution-off") : ipath("status-indicator-caution-on"));
+        st = api.getDeviceStateVariable(devNum, "urn:micasaverde-com:serviceId:SecuritySensor1", "Armed");
+        jQuery("div#sitesensor-status img#status-indicator-armed").attr('src', st == "0" ? ipath("status-indicator-armed-off") : ipath("status-indicator-armed-on"));
+        st = api.getDeviceStateVariable(devNum, "urn:micasaverde-com:serviceId:SecuritySensor1", "Tripped");
+        jQuery("div#sitesensor-status img#status-indicator-tripped").attr('src', st == "0" ? ipath("status-indicator-tripped-off") : ipath("status-indicator-tripped-on"));
+
+        st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "LogRequests");
+        if ( st == "0" ) {
+            jQuery("div#sitesensor-log").hide();
+        } else {
+            jQuery("div#sitesensor-log").show();
+            st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "LogCapture");
+            st = st.replace(/[|]/g, "\n");
+            jQuery("div#sitesensor-log textarea").val(st);
+        }
+        
+        /* Periodic refresh */
+        setTimeout( updateIndicators, 1000 );
+    }
+
+    function controlPanel() {
+        try {
+            var html = "";
+
+            var devNum = api.getCpanelDeviceId();
+            
+            var st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "HideStatusIndicator");
+            if ( st == "1" || st == "true" ) {
+                return;
+            }
+            
+            html += '<div id="sitesensor-status" style="width: 418px; margin: auto; border: groove 5px #999999;">' + itag("status-left")
+                + itag("status-indicator-caution-on")
+                + itag("status-indicator-armed-off")
+                + itag("status-indicator-tripped-off")
+                + itag("status-right") 
+                + '</div>';
+                
+            html += '<div id="sitesensor-log" style="width: 630px; margin: auto; padding-top: 8px;"><textarea wrap="off" style="width: 100%; height: 146px; padding: 4px 4px 4px 4px; background-color: #f8f8f8; font-family: monospace; font-size: 12px;"></textarea>';
+            
+            // Push generated HTML to page
+            api.setCpanelContent(html);
+            
+            isVisible = true;
+
+            api.registerEventHandler('on_ui_cpanel_before_close', SiteSensor, 'onBeforeCpanelClose');
+            
+            updateIndicators();
+        } catch (e) {
+            Utils.logError("Error in SiteSensor1.controlPanel(): " + e);
+        }
+    }
 
     myModule = {
         uuid: uuid,
         initPlugin: initPlugin,
         onBeforeCpanelClose: onBeforeCpanelClose,
-        configurePlugin: configurePlugin
+        configurePlugin: configurePlugin,
+        controlPanel: controlPanel
     };
     return myModule;
 })(api);

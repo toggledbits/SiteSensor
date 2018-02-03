@@ -13,7 +13,8 @@
         <modelDescription>Site Sensor</modelDescription>
         <modelName>Site Sensor</modelName>
         <handleChildren>0</handleChildren>
-        <Category_Num>12</Category_Num>
+        <Category_Num>4</Category_Num>
+        <Subcategory_Num>1</Subcategory_Num>
         <serviceList>
           <service>
             <serviceType>urn:schemas-toggledbits-com:service:SiteSensor:1</serviceType>

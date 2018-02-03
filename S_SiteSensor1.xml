@@ -113,5 +113,15 @@
                 </argument>
             </argumentList>
         </action>
+        <action>
+            <name>LogRequests</name>
+            <argumentList>
+                <argument>
+                    <name>Enabled</name>
+                    <relatedStateVariable>LogRequests</relatedStateVariable>
+                    <direction>in</direction>
+                </argument>
+            </argumentList>
+        </action>
     </actionList>
 </scpd>

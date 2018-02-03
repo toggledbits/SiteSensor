@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <implementation>
-    <files>L_LuxaXP.lua</files>
+    <!-- files>L_LuaXP.lua</files -->
     <functions>
         -- -------------------------------------------------------------------------------------------------------------------------
         -- SiteSensor
@@ -11,6 +11,8 @@
             luup.log("SiteSensor Plugin START-UP!")
             SiteSensor = require("L_SiteSensor1")
             siteSensorRunQuery = SiteSensor.runQuery
+            siteSensorRequestHandler = SiteSensor.requestHandler
+            luup.register_handler("siteSensorRequestHandler", "SiteSensor")
             return SiteSensor.init(dev)
         end
     </functions>
@@ -49,6 +51,14 @@
             <run>
                 local newRequestURL = lul_settings.newTargetValue or ""
                 luup.variable_set("urn:toggledbits-com:serviceId:SiteSensor1", "RequestURL", newRequestURL, lul_device)
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <name>LogRequests</name>
+            <run>
+                local enabled = ( tonumber( lul_settings.Enabled ) or 0 ) ~= 0
+                SiteSensor.requestLogging( enabled, lul_device )
             </run>
         </action>
         <action>
