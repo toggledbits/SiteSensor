@@ -40,6 +40,10 @@
 			"TabType": "flash",
 			"top_navigation_tab": 1,
 			"TopNavigationTab": 1,
+            "AfterInit": {
+                "ScriptName": "J_SiteSensor1_UI7.js",
+                "Function": "SiteSensor.controlPanel"
+            },
 			"ControlGroup": [{
 				"id": "1",
 				"isSingle": "1",

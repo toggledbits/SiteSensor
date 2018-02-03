@@ -7,6 +7,8 @@ var SiteSensor = (function(api) {
     var serviceId = "urn:toggledbits-com:serviceId:SiteSensor1";
 
     var myModule = {};
+    
+    var isVisible = false;
 
     function updateResponseFields() {
         var rtype = jQuery('select#rtype').val();
@@ -30,10 +32,10 @@ var SiteSensor = (function(api) {
 
     function onBeforeCpanelClose(args) {
         // console.log('handler for before cpanel close');
+        isVisible = false;
     }
 
     function initPlugin() {
-        api.registerEventHandler('on_ui_cpanel_before_close', myModule, 'onBeforeCpanelClose');
     }
 
     function configurePlugin()
@@ -245,12 +247,67 @@ var SiteSensor = (function(api) {
             Utils.logError('Error in SiteSensor.configurePlugin(): ' + e);
         }
     }
+    
+    function ipath( i ) {
+        return 'https://www.toggledbits.com/sitesensor/img/' + i + '.png';
+    }
+    
+    function itag( i ) {
+        var id = i.replace(/-(off|on)$/i, "");
+        return '<img src="' + ipath( i ) + '" id="' + id + '" alt="' + id + '">';
+    }
+    
+    function updateIndicators() {
+        var devNum = api.getCpanelDeviceId();
+
+        // Set up defaults and (re)actions
+        var st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "Failed");
+        jQuery("div#sitesensor-status img#status-indicator-caution").attr('src', st == "0" ? ipath("status-indicator-caution-off") : ipath("status-indicator-caution-on"));
+        st = api.getDeviceStateVariable(devNum, "urn:micasaverde-com:serviceId:SecuritySensor1", "Armed");
+        jQuery("div#sitesensor-status img#status-indicator-armed").attr('src', st == "0" ? ipath("status-indicator-armed-off") : ipath("status-indicator-armed-on"));
+        st = api.getDeviceStateVariable(devNum, "urn:micasaverde-com:serviceId:SecuritySensor1", "Tripped");
+        jQuery("div#sitesensor-status img#status-indicator-tripped").attr('src', st == "0" ? ipath("status-indicator-tripped-off") : ipath("status-indicator-tripped-on"));
+        
+        if ( isVisible ) setTimeout( updateIndicators, 1000 );
+    }
+
+    function controlPanel() {
+        try {
+            var html = "";
+
+            var devNum = api.getCpanelDeviceId();
+            
+            var st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "HideStatusIndicator");
+            if ( st == "1" || st == "true" ) {
+                return;
+            }
+            
+            html += '<div id="sitesensor-status" style="width: 418px; margin: auto; border: groove 5px #999999;">' + itag("status-left")
+                + itag("status-indicator-caution-on")
+                + itag("status-indicator-armed-off")
+                + itag("status-indicator-tripped-off")
+                + itag("status-right") 
+                + '</div>';
+
+            // Push generated HTML to page
+            api.setCpanelContent(html);
+            
+            isVisible = true;
+
+            api.registerEventHandler('on_ui_cpanel_before_close', SiteSensor, 'onBeforeCpanelClose');
+            
+            updateIndicators();
+        } catch (e) {
+            Utils.logError("Error in SiteSensor1.controlPanel(): " + e);
+        }
+    }
 
     myModule = {
         uuid: uuid,
         initPlugin: initPlugin,
         onBeforeCpanelClose: onBeforeCpanelClose,
-        configurePlugin: configurePlugin
+        configurePlugin: configurePlugin,
+        controlPanel: controlPanel
     };
     return myModule;
 })(api);
