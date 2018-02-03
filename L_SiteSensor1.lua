@@ -27,6 +27,9 @@ local isALTUI = false
 local isOpenLuup = false
 local debugMode = false
 
+local logCapture = {}
+local logMax = 50
+
 local https = require("ssl.https")
 local http = require("socket.http")
 local ltn12 = require("ltn12")
@@ -56,25 +59,20 @@ local function dump(t)
 end
 
 local function L(msg, ...)
-    local str
-    if type(msg) == "table" then
-        str = msg["prefix"] .. msg["msg"]
-    else
-        str = _PLUGIN_NAME .. ": " .. msg
-    end
-    str = string.gsub(str, "%%(%d+)", function( n )
+    local str = string.gsub(msg, "%%(%d+)", function( n )
             n = tonumber(n, 10)
             if n < 1 or n > #arg then return "nil" end
             local val = arg[n]
             if type(val) == "table" then
                 return dump(val)
-            elseif type(val) == "string" then
-                return string.format("%q", val)
             end
             return tostring(val)
         end
     )
-    luup.log(str)
+    luup.log(_PLUGIN_NAME .. ": " .. str)
+    table.insert( logCapture, os.date("%X") .. ": " .. str )
+    if #msg > logMax then table.remove( logCapture, 1 ) end
+    luup.variable_set( MYSID, "LogCapture", table.concat( logCapture, "|" ), luup.device )
 end
 
 local function D(msg, ...)
@@ -363,7 +361,7 @@ local function doRequest(url, method, body, dev)
     respBody = table.concat(r)
 
     if logRequest then
-        L("Response status %1, body=%2", httpStatus, respBody)
+        L("Response HTTP status %1, body=%2", httpStatus, respBody)
     end
     
     -- Handle special errors from socket library
@@ -396,6 +394,10 @@ local function doMatchQuery( dev )
     local err = false
     local matchValue
     local requestor = http
+    
+    -- Clear log capture for new request
+    logCapture = {}
+    setMessage("Performing query...", dev)
 
     -- Perform on-the-fly substitution of request values
     url = substitution( url, urlencode, dev )
@@ -426,7 +428,6 @@ local function doMatchQuery( dev )
     -- We don't use doRequest here because we can stop and close the
     -- connection as soon as we find our pattern string.
     http.TIMEOUT = timeout
-    setMessage("Requesting...", dev)
     if logRequest then
         L("HTTP %2 %1, headers=%3", url, method, tHeaders)
     end
@@ -524,25 +525,41 @@ end
 
 local function doEval( dev, ctx )
     local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
-
+    local numErrors = 0
+    
     -- Since we got a valid response, indicate not tripped, unless using TripExpression, then that.
     -- Reset state var for (in)valid response?
-    setMessage("Processing response...", dev)
+    setMessage("Retrieving last response...", dev)
     
     if ctx == nil then 
         local lr = luup.variable_get( MYSID, "LastResponse", dev ) or ""
         if lr == "" then    
             L("No prior response to evaluate.")
+            setMessage( "Empty or invalid response data.", dev )
+            fail( true, dev )
             return
         end
         local pos, err
         ctx, pos, err = dkjson.decode( lr )
         if err then
             L("Unable parse stored prior result. That's... unexpected. %1 at %2", err, pos)
+            setMessage( "Invalid JSON in response.", dev )
+            fail( true, dev )
             return
         end
-        if logRequest then L("Performing re-evaluation of last response.") end
+        if ctx.status.valid == 0 then
+            msg = "Last query failed, "
+            if ctx.status.httpStatus ~= 200 then
+                msg = msg .. "HTTP status " .. tostring(ctx.status.httpStatus)
+            else
+                msg = msg .. "JSON error " .. ctx.status.jsonStatus
+            end
+            fail( true, dev )
+            return
+        end
     end
+
+    if logRequest then L("Evaluating response") end
     
     -- Valid response. Let's parse it and set our variables.
     local i
@@ -556,6 +573,9 @@ local function doEval( dev, ctx )
                 r = parseRefExpr(ex, ctx)
                 if logRequest then L("Eval #%1: %2=(%3)%4", i, ex, type(r), r) end
                 D("doEval() parsed value of %1 is %2", ex, tostring(r))
+                if r == nil then    
+                    numErrors = numErrors + 1
+                end
             end
         else
             luup.variable_set(MYSID, "Expr" .. tostring(i), "", dev)
@@ -591,6 +611,7 @@ local function doEval( dev, ctx )
         D("doEval() parsing TripExpression %1", texp)
         local r = nil
         if texp ~= nil then r = parseRefExpr(texp, ctx) end
+        if r == nil then numErrors = numErrors + 1 end
         D("doEval() TripExpression result is %1", r)
         if logRequest then L("Eval trip expression: %1=(%2)%3", texp, type(r), r) end
         if r == nil
@@ -611,15 +632,12 @@ local function doEval( dev, ctx )
     end
 
     local msg
-    if ctx.status.valid == 0 then
-        msg = "Last query failed, "
-        if ctx.status.httpStatus ~= 200 then
-            msg = msg .. "HTTP status " .. tostring(ctx.status.httpStatus)
-        else
-            msg = msg .. "JSON error " .. ctx.status.jsonStatus
-        end
+    if numErrors > 0 then
+        msg = string.format("Query OK, but %d expressions failed", numErrors)
+        fail( true, dev )
     else
         msg = "Last query succeeded!"
+        fail( false, dev )
     end
     setMessage( msg, dev )
 end
@@ -634,6 +652,9 @@ local function doJSONQuery(dev)
     local body, httpStatus, httpHeaders
     local err = false
     local ttype = luup.variable_get(MYSID, "Trigger", dev) or "err"
+    
+    -- Clear log capture for new request
+    logCapture = {}
 
     setMessage("Requesting JSON...", dev)
     err,body,httpStatus = doRequest(url, "GET", nil, dev)

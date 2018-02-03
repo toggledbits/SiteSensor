@@ -268,6 +268,10 @@ var SiteSensor = (function(api) {
         st = api.getDeviceStateVariable(devNum, "urn:micasaverde-com:serviceId:SecuritySensor1", "Tripped");
         jQuery("div#sitesensor-status img#status-indicator-tripped").attr('src', st == "0" ? ipath("status-indicator-tripped-off") : ipath("status-indicator-tripped-on"));
         
+        st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "LogCapture");
+        st = st.replace(/[|]/g, "\n");
+        jQuery("div#sitesensor-log textarea").val(st);
+        
         if ( isVisible ) setTimeout( updateIndicators, 1000 );
     }
 
@@ -288,7 +292,12 @@ var SiteSensor = (function(api) {
                 + itag("status-indicator-tripped-off")
                 + itag("status-right") 
                 + '</div>';
-
+                
+            st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "LogRequests");
+            if ( st == "1" ) {
+                html += '<div id="sitesensor-log" style="width: 630px; margin: auto; padding-top: 8px;"><textarea wrap="off" style="width: 100%; height: 146px; padding: 4px 4px 4px 4px; background-color: #f8f8f8; font-family: monospace; font-size: 12px;"></textarea>';
+            }
+            
             // Push generated HTML to page
             api.setCpanelContent(html);
             
