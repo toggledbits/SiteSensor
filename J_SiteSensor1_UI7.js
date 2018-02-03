@@ -1,3 +1,4 @@
+//# sourceURL=J_SiteSensor1_UI7.js
 var SiteSensor = (function(api) {
 
     // unique identifier for this plugin...
@@ -118,6 +119,12 @@ var SiteSensor = (function(api) {
 
             html += '<p>The JSON data is encapsulated within a "response" key, so if your JSON data looks like the example below, the value <i>errCode</i> would be accessed by the expression <tt>response.errCode</tt>, while the value <i>name</i> would be accessed using <tt>response.type.name</tt>. Refer to the <a href="#">documentation</a> for more details.</p>';
             html += "<code>{\n    \"errCode\": 0,\n    \"type\": {\n        \"name\": \"Normal\",\n        \"class\": \"apiobject\"\n    }\n}</code>";
+            
+            html += "<h2>Options</h2>";
+            html += '<label for="reeval">Re-evaluate the expressions</label>&nbsp;<select id="reeval"><option value="">only immediately after requests (default)</option>';
+            html += '<option value="60">every minute</option>';
+            html += '</select>';
+            html += '<br/>If you have expressions comparing API responses to the current time and date, it is recommended that you re-evaluate them between requests and make your Request Interval longer. This avoids spamming the remote API with requests for data that rarely changes, but still gives you fast response to time-triggered events.';
 
             html += "</div>"; // tb-jsoncontrols
 
@@ -203,6 +210,21 @@ var SiteSensor = (function(api) {
             jQuery("input#tripexpression").val(s ? s : "").change( function( obj ) {
                 var newExpr = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "TripExpression", newExpr, 0);
+            });
+            
+            s = api.getDeviceState(myDevice, serviceId, "EvalInterval");
+            if (s) {
+                // If the currently selected option isn't on the list, add it, so we don't lose it.
+                var el = jQuery('select#reeval option[value="' + s + '"]');
+                if ( el.length == 0 ) {
+                    jQuery('select#reeval').append($('<option>', { value: s }).text('Every ' + s + ' seconds (custom)').prop('selected', true));
+                } else {
+                    el.prop('selected', true);
+                }
+            }
+            jQuery("select#reeval").change( function( obj ) {
+                var newVal = jQuery(this).val();
+                api.setDeviceStatePersistent(myDevice, serviceId, "EvalInterval", newVal, 0);
             });
 
             $('input.jsonexpr').each( function( obj ) {
