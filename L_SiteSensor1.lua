@@ -94,7 +94,7 @@ end
 local function parseRefExpr(ex, ctx)
     D("parseRefExpr(%1,ctx)", ex, ctx)
     local cx, err
-    cx, err = luaxp.compile(ex)
+    cx, err = luaxp.compile(ex,ctx)
     if cx == nil then
         L("Failed to parse expression `%1', %2", ex, err)
         return nil
@@ -562,22 +562,25 @@ local function doEval( dev, ctx )
         end
 
         -- Canonify the result value
+        local rv
         if r == nil then
-            r = ""
+            rv = ""
         elseif type(r) == "boolean" then
-            if r then r = "1" else r = "0" end
+            if r then rv = "true" else rv = "false" end
+        elseif type(r) == "table" then
+            rv = table.concat( r, "," )
         else
-            r = tostring(r)
+            rv = tostring(r)
         end
 
         -- Save if changed.
-        ctx.expr[i] = r
+        ctx.expr[i] = r -- raw value, not canonical
         local oldVal = luup.variable_get(MYSID, "Value" .. tostring(i), dev)
-        D("doEval() newval=%1, oldVal=%2", r, oldVal)
-        if r ~= oldVal then
+        D("doEval() newval=(%1)%2 canonical %3, oldVal=%4", type(r), r, rv, oldVal)
+        if rv ~= oldVal then
             -- Set new value only if changed
-            D("doEval() Expr%1 value changed, was %2 now %3", i, oldVal, r)
-            luup.variable_set(MYSID, "Value" .. tostring(i), tostring(r), dev)
+            D("doEval() Expr%1 value changed, was %2 now %3", i, oldVal, rv)
+            luup.variable_set(MYSID, "Value" .. tostring(i), rv, dev)
         end
     end
 
@@ -591,9 +594,9 @@ local function doEval( dev, ctx )
         D("doEval() TripExpression result is %1", r)
         if logRequest then L("Eval trip expression: %1=(%2)%3", texp, type(r), r) end
         if r == nil
-            or (type(r) == "boolean" and r == false)
-            or (type(r) == "number" and r == 0)
-            or (type(r) == "string" and string.len(r) == 0)
+            or ( type(r) == "boolean" and r == false )
+            or ( type(r) == "number" and r == 0 )
+            or ( type(r) == "string" and ( string.len(r) == 0 or r == "0" or r == "false" ) ) -- some magic strings
         then
             -- Trip expression is logically (for us) false
             trip(false, dev)
