@@ -12,7 +12,7 @@
 module("L_SiteSensor1", package.seeall)
 
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.4dev"
+local _PLUGIN_VERSION = "1.4"
 local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 010400
 
@@ -705,7 +705,7 @@ local function runOnce(dev)
         luup.variable_set(MYSID, "LastQuery", "0", dev)
         luup.variable_set(MYSID, "LastRun", "0", dev)
         luup.variable_set(MYSID, "LogRequests", "0", dev)
-        luup.variable_set(MYSID, "EvalInterval", 0, dev)
+        luup.variable_set(MYSID, "EvalInterval", "", dev)
 
         luup.variable_set(SSSID, "LastTrip", "0", dev)
         luup.variable_set(SSSID, "Armed", "0", dev)
@@ -720,7 +720,7 @@ local function runOnce(dev)
 
     if rev < 10400 then
         D("runOnce() Upgrading config to 10400")
-        luup.variable_set(MYSID, "EvalInterval", "0", dev)
+        luup.variable_set(MYSID, "EvalInterval", "", dev)
         luup.variable_set(HASID, "ModeSetting", "1:;2:;3:;4:", dev )
     end
     
