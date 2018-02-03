@@ -852,6 +852,16 @@ function disarm(dev)
     luup.variable_set(SSSID, "ArmedTripped", "0", dev)
 end
 
+function requestLogging( enabled, dev )
+    D("requestLogging(%1,%2)", enabled, dev )
+    if enabled then
+        luup.variable_set( MYSID, "LogRequests", "1", dev )
+        L("Request logging enabled. Detailed logging will begin at next request/eval.")
+    else
+        luup.variable_set( MYSID, "LogRequests", "0", dev )
+    end
+end
+
 local function getDevice( dev, pdev, v )
     local dkjson = require("dkjson")
     if v == nil then v = luup.devices[dev] end
