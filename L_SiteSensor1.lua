@@ -58,8 +58,12 @@ local function dump(t)
     return str
 end
 
-local function L(msg, ...)
-    local str = string.gsub(msg, "%%(%d+)", function( n )
+local function L(m, ...)
+    local prefix = _PLUGIN_NAME .. ": "
+    local level = 50
+    local msg
+    if type(m)=="table" then msg = (m.msg or "") prefix=(m.prefix or prefix) level=(m.level or level) else msg = tostring(m) end
+    msg = string.gsub(msg, "%%(%d+)", function( n )
             n = tonumber(n, 10)
             if n < 1 or n > #arg then return "nil" end
             local val = arg[n]
@@ -69,10 +73,12 @@ local function L(msg, ...)
             return tostring(val)
         end
     )
-    luup.log(_PLUGIN_NAME .. ": " .. str)
-    table.insert( logCapture, os.date("%X") .. ": " .. str )
-    if #msg > logMax then table.remove( logCapture, 1 ) end
-    luup.variable_set( MYSID, "LogCapture", table.concat( logCapture, "|" ), luup.device )
+    luup.log(prefix .. msg, level)
+    if type(m) == "string" then -- don't capture debug
+        table.insert( logCapture, os.date("%X") .. ": " .. msg )
+        if #logCapture > logMax then table.remove( logCapture, 1 ) end
+        luup.variable_set( MYSID, "LogCapture", table.concat( logCapture, "|" ), luup.device )
+    end
 end
 
 local function D(msg, ...)
@@ -216,13 +222,14 @@ function scheduleNext(dev, delay, stamp)
     if qtype == "json" then
         local evalTick = getVarNumeric("EvalInterval", 0, dev)
         if evalTick > 0 and evalTick < delay then
+            D("scheduleNext() reducing delay from %1 to %2 for EvalInterval", delay, evalTick)
             delay = evalTick
         end
     end
     
     -- Book it.
     if delay < 1 then delay = 1 end
-    D("scheduleNext() scheduling next run for %1 secs", delay)
+    L("Next activity in %1 seconds", delay)
     luup.call_delay("siteSensorRunQuery", delay, string.format("%d:%d", stamp, dev))
 end
 
@@ -559,8 +566,6 @@ local function doEval( dev, ctx )
         end
     end
 
-    if logRequest then L("Evaluating response") end
-    
     -- Valid response. Let's parse it and set our variables.
     local i
     ctx.expr = {}
@@ -657,6 +662,7 @@ local function doJSONQuery(dev)
     logCapture = {}
 
     setMessage("Requesting JSON...", dev)
+    if logRequest then L("Requesting JSON data") end
     err,body,httpStatus = doRequest(url, "GET", nil, dev)
     local ctx = { response={}, status={ timestamp=os.time(), valid=0, httpStatus=httpStatus } }
     if body == nil or err then
@@ -804,6 +810,7 @@ function runQuery(p)
         -- Not time, but for JSON we may do an eval if re-eval ticks are enabled.
         local evalTick = getVarNumeric( "EvalInterval", 0, dev )
         if evalTick > 0 then
+            L("Performing re-evaluation of prior response")
             doEval( dev ) -- pass no context, doEval will reproduce it
         end
     end
