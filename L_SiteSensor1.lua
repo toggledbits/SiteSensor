@@ -891,7 +891,7 @@ end
 
 function requestHandler(lul_request, lul_parameters, lul_outputformat)
     D("requestHandler(%1,%2,%3) luup.device=%4", lul_request, lul_parameters, lul_outputformat, luup.device)
-    local action = lul_parameters["command"] or ""
+    local action = lul_parameters['action'] or lul_parameters["command"] or ""
     if action == "debug" then
         debugMode = not debugMode
         return "Debug is now " .. tostring(debugMode), "text/plain"
