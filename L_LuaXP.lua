@@ -11,7 +11,7 @@ module("L_LuaXP", package.seeall)
 
 local _M = {}
 
-_VERSION = "0.9.4"
+_VERSION = "0.9.4+20180205"
 _DEBUG = false -- Caller may set boolean true or function(msg)
 
 -- Binary operators and precedence (lower prec is higher precedence)
@@ -47,13 +47,13 @@ local UNOP = 'unop'
 local BINOP = 'binop'
 local TNUL = 'null'
 
-local NULLATOM = { ['type']=TNUL }
+local NULLATOM = { __type=TNUL }
 
 local charmap = { t = "\t", r = "\r", n = "\n" }
 
 local reservedWords = { ['false']=false, ['true']=true, pi=3.14159265, ['null']=NULLATOM, ['nil']=NULLATOM }
 
-local function dump(t, seen)
+function dump(t, seen)
     if seen == nil then seen = {} end
     local typ = base.type(t)
     local st = ""
@@ -85,9 +85,9 @@ local function D(s, ...)
             n = tonumber(n, 10)
             if n < 1 or n > #arg then return "nil" end
             local val = arg[n]
-            if type(val) == "table" then
+            if base.type(val) == "table" then
                 return dump(val)
-            elseif type(val) == "string" then
+            elseif base.type(val) == "string" then
                 return string.format("%q", val)
             end
             return tostring(val)
@@ -101,24 +101,38 @@ local _comp, _run, scan_token
 
 -- Utility functions
 
--- Value is atom if it matches our pattern, and specific type of atom if matches type passwd
+local function deepcopy( t )
+    if base.type(t) ~= "table" then return t end
+    local k,v
+    local r = {}
+    for k,v in pairs( t ) do
+        if base.type(v) == "table" then
+            r[k] = deepcopy(v)
+        else
+            r[k] = v
+        end
+    end
+    return r
+end
+
+-- Value is atom if it matches our atom pattern, and specific atom type if passed
 local function isAtom( v, typ )
-    return base.type(v) == "table" and v.type ~= nil and ( typ == nil or v.type == typ )
+    return base.type(v) == "table" and v.__type ~= nil and ( typ == nil or v.__type == typ )
 end
 
 -- Special case null atom
-local function isNull( v )
+function isNull( v )
     return isAtom( v, TNUL )
 end
 
 local function comperror(msg, loc)
     -- print("throwing comperror at " .. tostring(loc) .. ": " .. tostring(msg))
-    return error( { source='LuaXP', ['type']='compile', location=loc, message=msg } )
+    return error( { __source='luaxp', ['type']='compile', location=loc, message=msg } )
 end
 
-local function evalerror(msg, loc)
+function evalerror(msg, loc)
     -- print("throwing evalerror at " .. tostring(loc) .. ": " .. tostring(msg))
-    return error( { source='LuaXP', ['type']='evaluation', location=loc, message=msg } )
+    return error( { __source='luaxp', ['type']='evaluation', location=loc, message=msg } )
 end
 
 local function xp_pow(b, x)
@@ -182,7 +196,7 @@ end
 -- Somewhat simple time parsing. Handles the most common forms of ISO 8601, plus many less regular forms.
 -- If mm/dd vs dd/mm is ambiguous, it tries to discern using current locale's rule.
 local function xp_parse_time( t )
-    if type(t) == "number" then return t end -- if already numeric, assume it's already timestamp
+    if base.type(t) == "number" then return t end -- if already numeric, assume it's already timestamp
     if t == nil or tostring(t):lower() == "now" then return os.time() end
     t = tostring(t) -- force string
     local now = os.time()
@@ -424,7 +438,9 @@ local function xp_keys( arr )
     local k
     local r = {}
     for k,_ in pairs( arr ) do
-        table.insert( r, k )
+        if k ~= "__context" then
+            table.insert( r, k )
+        end
     end
     return r
 end
@@ -471,7 +487,7 @@ local nativeFuncs = {
     , ['ltrim'] = { nargs = 1, impl = function( argv ) return xp_ltrim(tostring(argv[1])) end }
     , ['rtrim'] = { nargs = 1, impl = function( argv ) return xp_rtrim(tostring(argv[1])) end }
     , ['tostring'] = { nargs = 1, impl = function( argv ) if isNull(argv[1]) then return "" else return tostring(argv[1]) end end }
-    , ['tonumber'] = { nargs = 1, impl = function( argv ) if type(argv[1]) == "boolean" then if argv[1] then return 1 else return 0 end end return tonumber(argv[1], argv[2] or 10) or evalerror('Argument could not be converted to number') end }
+    , ['tonumber'] = { nargs = 1, impl = function( argv ) if base.type(argv[1]) == "boolean" then if argv[1] then return 1 else return 0 end end return tonumber(argv[1], argv[2] or 10) or evalerror('Argument could not be converted to number') end }
     , ['format'] = { nargs = 1, impl = function( argv ) return string.format( unpack(argv) ) end }
     , ['time']  = { nargs = 0, impl = function( argv ) return xp_parse_time( argv[1] ) end }
     , ['strftime'] = { nargs = 1, impl = function( argv ) return os.date(unpack(argv)) end }
@@ -480,9 +496,12 @@ local nativeFuncs = {
     , ['choose'] = { nargs = 2, impl = function( argv ) local ix = argv[1] if ix < 1 or ix > (#argv-2) then return argv[2] else return argv[ix+2] end end }
     , ['select'] = { nargs = 3, impl = function( argv ) return xp_select(argv[1],argv[2],argv[3]) end }
     , ['keys'] = { nargs = 1, impl = function( argv ) return xp_keys( argv[1] ) end }
-    , ['iterate'] = { nargs = 2, impl = function( argv ) return xp_iter( argv.context, argv[1], argv[2], argv[3] ) end }
+    , ['iterate'] = { nargs = 2, impl = function( argv ) return xp_iter( argv.__context, argv[1], argv[2], argv[3] ) end }
     , ['if'] = { nargs = 2, impl = function( argv ) if argv[1] then return argv[2] or NULLATOM else return argv[3] or NULLATOM end end }
     , ['void'] = { nargs = 0, impl = function( argv ) return NULLATOM end }
+    , ['list'] = { nargs = 0, impl = function( argv ) local b = deepcopy( argv ) b.__context=nil return b end }
+    , ['first'] = { nargs = 1, impl = function( argv ) local arr = argv[1] if base.type(arr) ~= "table" or #arr == 0 then return NULLATOM else return arr[1] end end }
+    , ['last'] = { nargs = 1, impl = function( argv ) local arr = argv[1] if base.type(arr) ~= "table" or #arr == 0 then return NULLATOM else return arr[#arr] end end }
 }
 
 -- Adapted from "BitUtils", Lua-users wiki at http://lua-users.org/wiki/BitUtils; thank you kind stranger(s)...
@@ -645,7 +664,7 @@ local function scan_fref( expr, index, name )
                 end
                 index = index + 1
                 D("scan_fref returning, function is %1 with %2 args", name, table.getn(args), dump(args))
-                return index, { ['type']=FREF, args=args, name=name, pos=index }
+                return index, { __type=FREF, args=args, name=name, pos=index }
             else
                 -- It's part of our argument, so just add it to the subexpress string
                 subexp = subexp .. ch
@@ -693,7 +712,7 @@ local function scan_aref( expr, index, name )
             D("scan_aref: Found a closing bracket, subexp=%1", subexp)
             args = _comp(subexp)
             D("scan_aref returning, array is %1", name)
-            return index+1, { ['type']=VREF, name=name, index=args, pos=index }
+            return index+1, { __type=VREF, name=name, index=args, pos=index }
         else
             subexp = subexp .. ch
             index = index + 1
@@ -726,7 +745,7 @@ local function scan_vref( expr, index )
         index = index + 1
     end
 
-    return index, { ['type']=VREF, name=name, pos=index }
+    return index, { __type=VREF, name=name, pos=index }
 end
 
 -- Scan nested expression (called when ( seen while scanning for token)
@@ -767,7 +786,7 @@ local function scan_unop( expr, index )
         index = index + 1
         local k, r = scan_token( expr, index )
         if (r == nil) then return k, r end
-        return k, { r, { ['type']=UNOP, op=ch, pos=index } }
+        return k, { r, { __type=UNOP, op=ch, pos=index } }
     end
     return index, nil -- Not a UNOP
 end
@@ -809,7 +828,7 @@ local function scan_binop( expr, index )
     end
 
     D("scan_binop succeeds with op=%1", op)
-    return index, { ['type']=BINOP, op=op, prec=prec, pos=index }
+    return index, { __type=BINOP, op=op, prec=prec, pos=index }
 end
 
 -- Scan our next token (forward-declared)
@@ -924,7 +943,7 @@ local function check_operand( v1, allow1, v2, allow2 )
     return res
 end
 
-local function coerce(val, typ)
+function coerce(val, typ)
     local vt = base.type(val)
     D("coerce: attempt (%1)%2 to %3", vt, val, typ)
     if vt == typ then return val end -- already there?
@@ -1211,11 +1230,11 @@ _run = function( ce, ctx, stack )
             -- Run the implementation
             local status
             D("_run: calling %1 with args=%2", e.name, argv)
-            argv.context = ctx -- trickery
+            argv.__context = ctx -- trickery
             status, v = pcall(impl, argv)
             D("_run: finished %1() call, status=%2, result=%3", e.name, status, v)
             if not status then
-                if base.type(v) == "table" and v.source == "LuaXP" then
+                if base.type(v) == "table" and v.__source == "luaxp" then
                     v.location = e.pos
                     error(v) -- that one of our errors, just pass along
                 end
@@ -1225,7 +1244,7 @@ _run = function( ce, ctx, stack )
             D("_run: handling vref, name=%1, push to stack for later eval", e.name)
             v = e -- we're going to push the VREF directly.
         else
-            error("Bug: invalid object type in parse tree: " .. tostring(e.type), 0)
+            error("Bug: invalid atom type in parse tree: " .. tostring(e.__type), 0)
         end
 
         -- Push result to stack, move on in tree
@@ -1278,3 +1297,5 @@ function getLastError( compiledExpression )
     -- Eventually, return the error message and index within the string of where things went wrong
     return "some future error message", 0
 end
+
+NULL = NULLATOM
