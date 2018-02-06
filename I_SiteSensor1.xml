@@ -58,7 +58,7 @@
             <name>LogRequests</name>
             <run>
                 local enabled = ( tonumber( lul_settings.Enabled ) or 0 ) ~= 0
-                SiteSensor.requestLogging( enabled, lul_device )
+                SiteSensor.requestLogging( lul_device, enabled )
             </run>
         </action>
         <action>
@@ -72,6 +72,13 @@
                     SiteSensor.disarm(lul_device)
                 end
                 return true
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <name>SetDebug</name>
+            <run>
+                SiteSensor.actionSetDebug( lul_device, lul_settings.debug )
             </run>
         </action>
     </actionList>

@@ -852,13 +852,21 @@ function disarm(dev)
     luup.variable_set(SSSID, "ArmedTripped", "0", dev)
 end
 
-function requestLogging( enabled, dev )
-    D("requestLogging(%1,%2)", enabled, dev )
+function requestLogging( dev, enabled )
+    D("requestLogging(%1,%2)", dev, enabled )
     if enabled then
         luup.variable_set( MYSID, "LogRequests", "1", dev )
         L("Request logging enabled. Detailed logging will begin at next request/eval.")
     else
         luup.variable_set( MYSID, "LogRequests", "0", dev )
+    end
+end
+
+function actionSetDebug( dev, state )
+    D("actionSetDebug(%1,%2)", dev, state)
+    if state == 1 or state == "1" or state == true or state == "true" then 
+        debugMode = true 
+        D("actionSetDebug() debug logging enabled")
     end
 end
 
@@ -894,9 +902,10 @@ end
 function requestHandler(lul_request, lul_parameters, lul_outputformat)
     D("requestHandler(%1,%2,%3) luup.device=%4", lul_request, lul_parameters, lul_outputformat, luup.device)
     local action = lul_parameters['action'] or lul_parameters["command"] or ""
+    local deviceNum = tonumber( lul_parameters['device'], 10 ) or luup.device
     if action == "debug" then
-        debugMode = not debugMode
-        return "Debug is now " .. tostring(debugMode), "text/plain"
+        local err,msg,job,args = luup.call_action( MYSID, "SetDebug", { debug=1 }, deviceNum )
+        return string.format("Device #%s result: %s, %s, %s, %s", tostring(deviceNum), tostring(err), tostring(msg), tostring(job), dump(args))
     end
 
     if action:sub( 1, 3 ) == "ISS" then
@@ -920,7 +929,6 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
                     local dev = { id=tostring(lnum),
                         name=ldev.description or ("#" .. lnum),
                         ["type"]="DevDoor",
-                        defaultIcon=nil,
                         params={
                             { key="armable", value="1" },
                             { key="ackable", value="0" },
