@@ -38,10 +38,10 @@ local luaxp = require("L_LuaXP")
 
 local function dump(t)
     if t == nil then return "nil" end
-    local k,v,str,val
     local sep = ""
     local str = "{ "
     for k,v in pairs(t) do
+        local val
         if type(v) == "table" then
             val = dump(v)
         elseif type(v) == "function" then
@@ -330,8 +330,7 @@ local function doRequest(url, method, body, dev)
     local moreHeaders = luup.variable_get(MYSID, "Headers", dev) or ""
     if string.len(moreHeaders) > 0 then
         local h = split(moreHeaders, "|")
-        local ix,hh
-        for ix,hh in ipairs(h) do
+        for _,hh in ipairs(h) do
             local nh = split(hh, ":")
             if #nh == 2 then
                 tHeaders[nh[1]] = substitution( urldecode( nh[2] ), nil, dev )
@@ -348,13 +347,13 @@ local function doRequest(url, method, body, dev)
     end
 
     -- Make the request.
-    local respBody, httpStatus, httpHeaders
+    local respBody, httpStatus
     local r = {}
     http.TIMEOUT = timeout -- N.B. http not https, regardless
     if logRequest then
         L("%2 %1, headers=%3", url, method, tHeaders)
     end
-    respBody, httpStatus, httpHeaders = requestor.request{
+    respBody, httpStatus = requestor.request{
         url = url,
         source = src,
         sink = ltn12.sink.table(r),
@@ -400,7 +399,6 @@ local function doMatchQuery( dev )
     local matched = false
     local err = false
     local matchValue
-    local requestor = http
     
     -- Clear log capture for new request
     logCapture = {}
@@ -421,8 +419,7 @@ local function doMatchQuery( dev )
     local moreHeaders = luup.variable_get(MYSID, "Headers", dev) or ""
     if string.len(moreHeaders) > 0 then
         local h = split(moreHeaders, "|")
-        local ix,hh
-        for ix,hh in ipairs(h) do
+        for _,hh in ipairs(h) do
             local nh = split(hh, ":")
             if #nh == 2 then
                 tHeaders[nh[1]] = substitution( urldecode( nh[2] ), nil, dev )
@@ -515,7 +512,6 @@ local function doMatchQuery( dev )
 
     -- Set trip state based on result.
     D("doMatchQuery() matched is %1", matched)
-    local tripState = isTripped(dev)
     local newTrip
     if trigger == "neg" then
         newTrip = not matched
@@ -555,19 +551,19 @@ local function doEval( dev, ctx )
             return
         end
         if ctx.status.valid == 0 then
-            msg = "Last query failed, "
+            local msg = "Last query failed, "
             if ctx.status.httpStatus ~= 200 then
                 msg = msg .. "HTTP status " .. tostring(ctx.status.httpStatus)
             else
                 msg = msg .. "JSON error " .. ctx.status.jsonStatus
             end
+            setMessage( msg, dev )
             fail( true, dev )
             return
         end
     end
 
     -- Valid response. Let's parse it and set our variables.
-    local i
     ctx.expr = {}
     for i = 1,8 do
         local r = nil
@@ -652,10 +648,6 @@ local function doJSONQuery(dev)
     assert(idata[dev] ~= nil)
     local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
     local url = luup.variable_get(MYSID, "RequestURL", dev) or ""
-    local timeout = getVarNumeric("Timeout", 30, dev)
-    local maxlength = getVarNumeric("MaxLength", 262144, dev)
-    local body, httpStatus, httpHeaders
-    local err = false
     local ttype = luup.variable_get(MYSID, "Trigger", dev) or "err"
     
     -- Clear log capture for new request
@@ -663,7 +655,7 @@ local function doJSONQuery(dev)
 
     setMessage("Requesting JSON...", dev)
     if logRequest then L("Requesting JSON data") end
-    err,body,httpStatus = doRequest(url, "GET", nil, dev)
+    local err,body,httpStatus = doRequest(url, "GET", nil, dev)
     local ctx = { response={}, status={ timestamp=os.time(), valid=0, httpStatus=httpStatus } }
     if body == nil or err then
         -- Error; trip sensor
@@ -678,16 +670,15 @@ local function doJSONQuery(dev)
         body = string.gsub( body, ": *false *,", ": 0," )
 
         -- Process JSON response. First parse response.
-        local t, pos, err
-        t, pos, err = dkjson.decode(body)
-        if err then
-            L("Unable to decode JSON response, %2 (dev %1)", dev, err)
+        local t, pos, e = dkjson.decode(body)
+        if e then
+            L("Unable to decode JSON response, %2 (dev %1)", dev, e)
             -- If TripExpression isn't used, trip follows status
             fail(true, dev)
             if ttype == "err" then trip(true, dev) end
             -- Set state var for invalid response?
             setMessage("Invalid response", dev)
-            ctx.status.jsonStatus = err
+            ctx.status.jsonStatus = e
         else
             D("doJSONQuery() parsed response")
             -- Encapsulate the response
@@ -871,7 +862,6 @@ function actionSetDebug( dev, state )
 end
 
 local function getDevice( dev, pdev, v )
-    local dkjson = require("dkjson")
     if v == nil then v = luup.devices[dev] end
     local devinfo = { 
           devNum=dev
@@ -910,20 +900,17 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
 
     if action:sub( 1, 3 ) == "ISS" then
         -- ImperiHome ISS Standard System API, see http://dev.evertygo.com/api/iss#types
-        local dkjson = require('dkjson')
         local path = lul_parameters['path'] or action:sub( 4 ) -- Work even if I'home user forgets &path=
         if path == "/system" then
             return dkjson.encode( { id="SiteSensor-" .. luup.pk_accesspoint, apiversion=1 } ), "application/json"
         elseif path == "/rooms" then
             local roomlist = { { id=0, name="No Room" } }
-            local rn,rr
             for rn,rr in pairs( luup.rooms ) do 
                 table.insert( roomlist, { id=rn, name=rr } )
             end
             return dkjson.encode( { rooms=roomlist } ), "application/json"
         elseif path == "/devices" then
             local devices = {}
-            local lnum,ldev
             for lnum,ldev in pairs( luup.devices ) do
                 if ldev.device_type == MYTYPE then
                     local dev = { id=tostring(lnum),
@@ -941,7 +928,6 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
                     table.insert( devices, dev )
                     
                     -- Make a device for each formula that stores a value (if any). Skip empties.
-                    local k
                     for k = 1,8 do
                         local frm = luup.variable_get( MYSID, "Expr" .. k, lnum ) or ""
                         if frm ~= "" then
@@ -967,7 +953,6 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
     end
     
     if action == "status" then
-        local dkjson = require("dkjson")
         if dkjson == nil then return "Missing dkjson library", "text/plain" end
         local st = {
             name=_PLUGIN_NAME,
@@ -986,10 +971,9 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
             },            
             devices={}
         }
-        local k,v
         for k,v in pairs( luup.devices ) do
             if v.device_type == MYTYPE then
-                devinfo = getDevice( k, luup.device, v ) or {}
+                local devinfo = getDevice( k, luup.device, v ) or {}
                 table.insert( st.devices, devinfo )
             end
         end
@@ -1012,13 +996,11 @@ function init(dev)
     idata[dev] = {}
     
     -- Check for ALTUI and OpenLuup
-    local k,v
     for k,v in pairs(luup.devices) do
         if v.device_type == "urn:schemas-upnp-org:device:altui:1" then
-            local rc,rs,jj,ra
             D("init() detected ALTUI at %1", k)
             isALTUI = true
-            rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin", 
+            local rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin", 
                 { newDeviceType=MYTYPE, newScriptFile="J_SiteSensor1_ALTUI.js", newDeviceDrawFunc="SiteSensor_ALTUI.DeviceDraw" }, 
                 k )
             D("init() ALTUI's RegisterPlugin action returned resultCode=%1, resultString=%2, job=%3, returnArguments=%4", rc,rs,jj,ra)
