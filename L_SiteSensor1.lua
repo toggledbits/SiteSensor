@@ -199,7 +199,6 @@ function scheduleNext(dev, delay, stamp)
         if isArmed(dev) then
             delay = getVarNumeric("ArmedInterval", delay, dev)
         end
-        if delay < 60 then delay = 60 end
         D("scheduleNext() interval is %1", delay)
         
         -- Now, see if we've missed an interval
