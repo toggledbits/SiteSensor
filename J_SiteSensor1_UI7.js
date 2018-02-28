@@ -163,7 +163,7 @@ var SiteSensor = (function(api) {
                 s = 1800;
             jQuery("input#interval").val(s).change( function( obj ) {
                 var newInterval = jQuery(this).val();
-                if (newInterval.match(/^[0-9]+$/) && newInterval >= 60)
+                if (newInterval.match(/^[0-9]+$/) && newInterval > 0)
                     api.setDeviceStatePersistent(myDevice, serviceId, "Interval", newInterval, 0);
             });
 
