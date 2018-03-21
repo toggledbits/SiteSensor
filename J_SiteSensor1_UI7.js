@@ -249,7 +249,7 @@ var SiteSensor = (function(api) {
     }
     
     function ipath( i ) {
-        return 'https://www.toggledbits.com/sitesensor/img/' + i + '.png';
+        return 'https://www.toggledbits.com/assets/sitesensor/' + i + '.png';
     }
     
     function itag( i ) {
