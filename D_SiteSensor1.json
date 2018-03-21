@@ -1,7 +1,7 @@
 {
-	"default_icon": "https://www.toggledbits.com/sitesensor/assets/sitesensor-default.png",
+	"default_icon": "https://www.toggledbits.com/assets/sitesensor/sitesensor-default.png",
 	"state_icons": [{
-			"img": "https://www.toggledbits.com/sitesensor/assets/sitesensor-failed.png",
+			"img": "https://www.toggledbits.com/assets/sitesensor/sitesensor-failed.png",
 			"conditions": [{
 				"service": "urn:toggledbits-com:serviceId:SiteSensor1",
 				"variable": "Failed",
@@ -10,7 +10,7 @@
 			}]
 		},
 		{
-			"img": "https://www.toggledbits.com/sitesensor/assets/sitesensor-tripped.png",
+			"img": "https://www.toggledbits.com/assets/sitesensor/sitesensor-tripped.png",
 			"conditions": [{
 				"service": "urn:micasaverde-com:serviceId:SecuritySensor1",
 				"variable": "Tripped",
@@ -19,7 +19,7 @@
 			}]
 		},
 		{
-			"img": "https://www.toggledbits.com/sitesensor/assets/sitesensor-armed.png",
+			"img": "https://www.toggledbits.com/assets/sitesensor/sitesensor-armed.png",
 			"conditions": [{
 				"service": "urn:micasaverde-com:serviceId:SecuritySensor1",
 				"variable": "Armed",
