@@ -12,7 +12,7 @@
 module("L_SiteSensor1", package.seeall)
 
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.6dev"
+local _PLUGIN_VERSION = "1.6"
 local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 010400
 
@@ -58,24 +58,30 @@ local function dump(t)
     return str
 end
 
-local function L(m, ...)
-    local prefix = _PLUGIN_NAME .. ": "
+local function L(msg, ...)
+    local str
     local level = 50
-    local msg
-    if type(m)=="table" then msg = (m.msg or "") prefix=(m.prefix or prefix) level=(m.level or level) else msg = tostring(m) end
-    msg = string.gsub(msg, "%%(%d+)", function( n )
+    if type(msg) == "table" then
+        str = tostring(msg.prefix or _PLUGIN_NAME) .. ": " .. tostring(msg.msg)
+        level = msg.level or level
+    else
+        str = _PLUGIN_NAME .. ": " .. tostring(msg)
+    end
+    str = string.gsub(str, "%%(%d+)", function( n )
             n = tonumber(n, 10)
             if n < 1 or n > #arg then return "nil" end
             local val = arg[n]
             if type(val) == "table" then
                 return dump(val)
+            elseif type(val) == "string" then
+                return string.format("%q", val)
             end
             return tostring(val)
         end
     )
-    luup.log(prefix .. msg, level)
-    if type(m) == "string" then -- don't capture debug
-        table.insert( logCapture, os.date("%X") .. ": " .. msg )
+    luup.log(str, level)
+    if type(msg) == "string" then -- don't capture debug
+        table.insert( logCapture, os.date("%X") .. ": " .. str )
         if #logCapture > logMax then table.remove( logCapture, 1 ) end
         luup.variable_set( MYSID, "LogCapture", table.concat( logCapture, "|" ), luup.device )
     end
@@ -83,7 +89,7 @@ end
 
 local function D(msg, ...)
     if debugMode then
-        L({msg=msg,prefix=_PLUGIN_NAME .. "(debug)::"}, ...)
+        L( { msg=msg,prefix=_PLUGIN_NAME .. "(debug)::" }, ... )
     end
 end
 
