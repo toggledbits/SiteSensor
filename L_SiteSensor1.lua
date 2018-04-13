@@ -1006,8 +1006,12 @@ function init(dev)
             D("init() detected ALTUI at %1", k)
             isALTUI = true
             local rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin", 
-                { newDeviceType=MYTYPE, newScriptFile="J_SiteSensor1_ALTUI.js", newDeviceDrawFunc="SiteSensor_ALTUI.DeviceDraw" }, 
-                k )
+                { 
+                    newDeviceType=MYTYPE, 
+                    newScriptFile="J_SiteSensor1_ALTUI.js", 
+                    newDeviceDrawFunc="SiteSensor_ALTUI.DeviceDraw",
+                    newFavoriteFunc="SiteSensor_ALTUI.Favorite"
+                }, k )
             D("init() ALTUI's RegisterPlugin action returned resultCode=%1, resultString=%2, job=%3, returnArguments=%4", rc,rs,jj,ra)
         elseif v.device_type == "openLuup" then
             D("init() detected openLuup")
