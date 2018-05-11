@@ -119,7 +119,7 @@ var SiteSensor = (function(api) {
             }
             html += "</ol>";
 
-            html += '<p>The JSON data is encapsulated within a "response" key, so if your JSON data looks like the example below, the value <i>errCode</i> would be accessed by the expression <tt>response.errCode</tt>, while the value <i>name</i> would be accessed using <tt>response.type.name</tt>. Refer to the <a href="#">documentation</a> for more details.</p>';
+            html += '<p>The JSON data is encapsulated within a "response" key, so if your JSON data looks like the example below, the value <i>errCode</i> would be accessed by the expression <tt>response.errCode</tt>, while the value of <i>name</i> within the <i>type</i> key would be accessed using <tt>response.type.name</tt>. Refer to the <a href="https://www.toggledbits.com/sitesensor" target="_blank">plug-in documentation</a> for more details. Since SiteSensor uses <a href="https://www.toggledbits.com/luaxp" target="_blank">LuaXP</a> to evaluate expressions, you can also look at its <a href="https://www.toggledbits.com/luaxp/expressions" target="_blank">expression syntax</a> and <a href="https://www.toggledbits.com/luaxp/functions" target="_blank">built-in function reference</a> for guidance.</p>';
             html += "<code>{\n    \"errCode\": 0,\n    \"type\": {\n        \"name\": \"Normal\",\n        \"class\": \"apiobject\"\n    }\n}</code>";
             
             html += "<h2>Options</h2>";
