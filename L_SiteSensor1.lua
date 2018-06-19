@@ -14,7 +14,7 @@ module("L_SiteSensor1", package.seeall)
 local _PLUGIN_NAME = "SiteSensor"
 local _PLUGIN_VERSION = "1.7"
 local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
-local _CONFIGVERSION = 010400
+local _CONFIGVERSION = 10700
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local MYTYPE = "urn:schemas-toggledbits-com:device:SiteSensor:1"
@@ -93,12 +93,13 @@ local function D(msg, ...)
     end
 end
 
-local function split(s, sep)
-    local t = {}
-    if (#s == 0) then return t end -- empty string returns nothing
-    local p = string.format("([^%s]+)", sep or ",")
-    s:gsub(p, function(m) table.insert(t, m) end)
-    return t
+local function split( str, sep )
+    if sep == nil then sep = "," end
+    local arr = {}
+    if #str == 0 then return arr, 0 end
+    local rest = string.gsub( str or "", "([^" .. sep .. "]*)" .. sep, function( m ) table.insert( arr, m ) return "" end )
+    table.insert( arr, rest )
+    return arr, #arr
 end
 
 local function parseRefExpr(ex, ctx)
@@ -184,13 +185,7 @@ local function trip(tripped, dev)
             newVal = "0"
         end
         luup.variable_set(SSSID, "Tripped", newVal, dev)
-        if isArmed(dev) then
-            D("trip() marked armed-tripped")
-            luup.variable_set(SSSID, "ArmedTripped", newVal, dev)
-        else
-            D("trip() not armed-tripped")
-            luup.variable_set(SSSID, "ArmedTripped", "0", dev)
-        end
+        -- LastTrip and ArmedTripped are set as needed by Luup
     end
 end
 
@@ -372,7 +367,7 @@ local function doRequest(url, method, body, dev)
     respBody = table.concat(r)
 
     if logRequest then
-        L("Response HTTP status %1, body=%2", httpStatus, respBody)
+        L("Response HTTP status %1, body=" .. respBody, httpStatus) -- use concat to avoid quoting
     end
     
     -- Handle special errors from socket library
@@ -734,6 +729,7 @@ local function runOnce(dev)
         luup.variable_set(SSSID, "Armed", "0", dev)
         luup.variable_set(SSSID, "Tripped", "0", dev)
         luup.variable_set(SSSID, "ArmedTripped", "0", dev)
+        luup.variable_set(SSSID, "AutoUntrip", "0", dev)
         
         luup.variable_set(HASID, "ModeSetting", "1:;2:;3:;4:", dev )
         
@@ -745,6 +741,11 @@ local function runOnce(dev)
         D("runOnce() Upgrading config to 10400")
         luup.variable_set(MYSID, "EvalInterval", "", dev)
         luup.variable_set(HASID, "ModeSetting", "1:;2:;3:;4:", dev )
+    end
+    
+    if rev < 10700 then
+        D("runOnce() Upgrading config to 10700")
+        luup.variable_set(SSSID, "AutoUntrip", "0", dev)
     end
     
     -- No matter what happens above, if our versions don't match, force that here/now.
@@ -831,9 +832,7 @@ function arm(dev)
     assert(idata[dev] ~= nil)
     if not isArmed(dev) then
         luup.variable_set(SSSID, "Armed", "1", dev)
-        if isTripped(dev) then
-            luup.variable_set(SSSID, "ArmedTripped", "1", dev)
-        end
+        -- Do not set ArmedTripped; Luup semantics
         forceUpdate(dev)
     end
 end
@@ -845,7 +844,7 @@ function disarm(dev)
     if isArmed(dev) then
         luup.variable_set(SSSID, "Armed", "0", dev)
     end
-    luup.variable_set(SSSID, "ArmedTripped", "0", dev)
+    -- Do not set ArmedTripped; Luup semantics
 end
 
 function requestLogging( dev, enabled )
