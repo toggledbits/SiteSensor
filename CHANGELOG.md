@@ -1,30 +1,45 @@
-# SiteSensor #
+# CHANGELOG #
 
-## Introduction ##
+## Version 1.8 ##
 
-SiteSensor is a plugin for Vera home automation controllers that periodically makes requests of a remote
-server. Based on the response, it sets its "tripped" state (acting as a SecuritySensor device), and can also store
-parsed values from JSON data. This makes it possible to use a remote RESTful API without writing a plugin.
+* Subkey reference now do not issue runtime error, but return null. This allows functions like if() to check for and gently handle missing data (e.g. OpenWeatherMap.org does not always return wind data in its API response). This is actually a change made entirely to luaxp; the version of luaxp used by SiteSensor has been updated;
+* Support for MessageExpr state variable that, when set and non-empty, pushes the value of the expression to the device message on the dashboard card. In other words, this change lets you control the message that appears with the device on the dashboard;
+* Add scene/notification triggers for numeric comparisons of the 8 user-definable expressions;
+* Let Vera manage ArmedTripped entirely. This gives SiteSensor Vera's semantics for ArmedTripped (i.e. ArmedTripped only changes state when Armed=1; it is not reset to 0 when Armed is changed from 1 to 0 while Tripped=1, nor set to 1 when Armed is changed from 0 to 1 while Tripped=1);
+* Remove reference to makersupport.com for donations (they are currently defunct, unable to process payments), and direct would-be donors to a page on my web site.
 
-This has many uses. A trivial use may be to periodically make requests of a remote web site simply to determine
-if your home internet connection is operating properly. An only slightly-less trivial use would be to probe a
-remote site to determine that *it* is operating correctly (a poor man's up/down monitor). More complex, but
-perhaps still fun, is that you can have SiteSensor query the Twitter API and trigger a scene in your home to
-flash a light when someone mentions you in a tweet that contains the hashtag *#happyhour*.
+## Version 1.7 ##
+Released for openLuup only
 
-Currently, only HTTP/HTTPS GET queries are supported, but future plans include support for additional HTTP methods
-(POST, PUT, etc.), and direct TCP socket connections.
+* Fix namespace in XML header to comply with requirements of akbooer's new XML parser. This change affects openLuup only.
 
-SiteSensor has been tested on openLuup with AltUI.
+## Version 1.6 ##
 
-SiteSensor is written and supported by Patrick Rigney, aka rigpapa on the [Vera forums](http://http://forum.micasaverde.com/).
+* Support refresh of previous query results intermittently, to allow re-evaluation of time-based expressions with forcing a refetch from the remote API.
 
-For more information, see <http://www.toggledbits.com/sitesensor/>.
+## Version 1.5 (hotfix) ##
 
-## Reporting Bugs/Enhancement Requests ##
+* This version addresses an issue with certain dot-notation subreferences failing.
 
-Bug reports and enhancement requests are welcome! Please use the "Issues" link for the repository to open a new bug report or make an enhancement request.
+## Version 1.4 ##
 
-## License ##
+* Adds scene/notification triggers for boolean state of the 8 user-definable expressions;
+* Adds UI on the control panel to enable request logging;
+* Adds control panel display of log messages (when enable) and status indicators;
+* Changes the category and subcategory to appear like a door sensor (security sensor);
+* Adds support for ImperiHome ISS API;
+* Uses the latest version of luaxp for better expression evaluation, and in particular, adds better support for date/time handling; also fixes many evaluator bugs;
+* In support of time-relative response data and expressions, add the option to periodically re-evaluate expressions without refetching data. This avoids spamming remote APIs for time-based data that changes infrequently in order to force expression evaluation against current date/time.
+* Set a default value for ModeSetting state variable in an attempt to avoid Vera's default changing the armed/disarmed state automatically.
 
-SiteSensor is offered under GPL (the GNU Public License) 3.0. See the LICENSE file for details.
+## Version 1.3 ##
+
+* Minor bug fixes only.
+
+## Version 1.2 ##
+
+* Support for ALTUI and openLuup.
+
+## Version 1.1 ##
+
+* Initial public release.
