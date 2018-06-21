@@ -12,9 +12,9 @@
 module("L_SiteSensor1", package.seeall)
 
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.7"
+local _PLUGIN_VERSION = "1.8dev"
 local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
-local _CONFIGVERSION = 10700
+local _CONFIGVERSION = 10701
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local MYTYPE = "urn:schemas-toggledbits-com:device:SiteSensor:1"
@@ -594,8 +594,10 @@ local function doEval( dev, ctx )
             rv = tostring(r)
         end
 
-        -- Save if changed.
-        ctx.expr[i] = r -- raw value, not canonical
+        -- Add raw result to context (available to subsequent expressions)
+        ctx.expr[i] = r -- raw, not canonical
+        
+        -- Save to device state if changed.
         local oldVal = luup.variable_get(MYSID, "Value" .. tostring(i), dev)
         D("doEval() newval=(%1)%2 canonical %3, oldVal=%4", type(r), r, rv, oldVal)
         if rv ~= oldVal then
@@ -637,7 +639,13 @@ local function doEval( dev, ctx )
         msg = string.format("Query OK, but %d expressions failed", numErrors)
         fail( true, dev )
     else
-        msg = "Last query succeeded!"
+        local msgExpr = luup.variable_get(MYSID, "MessageExpr", dev) or ""
+        if msg == "" then
+            msg = "Last query succeeded!"
+        else
+            msg = parseRefExpr(msgExpr, ctx)
+            if msg == nil then msg = "?" end
+        end
         fail( false, dev )
     end
     setMessage( msg, dev )
@@ -746,6 +754,11 @@ local function runOnce(dev)
     if rev < 10700 then
         D("runOnce() Upgrading config to 10700")
         luup.variable_set(SSSID, "AutoUntrip", "0", dev)
+    end
+    
+    if rev < 10701 then
+        D("runOne() Upgrading config to 10701")
+        luup.variable_set(MYSID, "MessageExpr", "", dev)
     end
     
     -- No matter what happens above, if our versions don't match, force that here/now.
