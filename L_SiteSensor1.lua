@@ -975,6 +975,7 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
             },            
             devices={}
         }
+        st.luaxp_version = luaxp._VERSION or "?"
         for k,v in pairs( luup.devices ) do
             if v.device_type == MYTYPE then
                 local devinfo = getDevice( k, luup.device, v ) or {}
