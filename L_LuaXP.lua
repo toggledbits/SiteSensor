@@ -1061,7 +1061,7 @@ _run = function( ce, ctx, stack )
                     v = v[ix]
                     if v == nil then evalerror("Subscript out of range: " .. tostring(v2.name) .. "[" .. ix .. "]", v2.pos) end
                 end
-                if v == nil then 
+                if v == nil then
                     -- Convert nil to NULL (not error, yet--depends on what expression does with it)
                     v = NULLATOM
                 end
