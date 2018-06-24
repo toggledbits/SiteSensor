@@ -1,6 +1,6 @@
 # CHANGELOG #
 
-## Version 1.8 (development) ##
+## Version 1.8 ##
 
 * References to non-existent subkeys now do not issue runtime error, but return null. This allows functions like `if()` to check for and gently handle missing data (e.g. OpenWeatherMap.org does not always return wind data in its API response). This is actually a change made entirely to luaxp; the version of luaxp used by SiteSensor has been updated;
 * Support for `MessageExpr` state variable that, when set and non-empty, pushes the value of the expression to the device message on the dashboard card. In other words, this change lets you control the message that appears with the device on the dashboard;
