@@ -640,7 +640,7 @@ local function doEval( dev, ctx )
         fail( true, dev )
     else
         local msgExpr = luup.variable_get(MYSID, "MessageExpr", dev) or ""
-        if msg == "" then
+        if msgExpr == "" then
             msg = "Last query succeeded!"
         else
             msg = parseRefExpr(msgExpr, ctx)
