@@ -12,9 +12,9 @@
 module("L_SiteSensor1", package.seeall)
 
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.8"
+local _PLUGIN_VERSION = "1.8develop"
 local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
-local _CONFIGVERSION = 10701
+local _CONFIGVERSION = 10900
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local MYTYPE = "urn:schemas-toggledbits-com:device:SiteSensor:1"
@@ -741,6 +741,9 @@ local function runOnce(dev)
         
         luup.variable_set(HASID, "ModeSetting", "1:;2:;3:;4:", dev )
         
+        luup.attr_set( "category_num", 4, dev )
+        luup.attr_set( "subcategory_num", "", dev )
+        
         luup.variable_set(MYSID, "Version", _CONFIGVERSION, dev)
         return
     end
@@ -757,8 +760,14 @@ local function runOnce(dev)
     end
     
     if rev < 10701 then
-        D("runOne() Upgrading config to 10701")
+        D("runOnce() Upgrading config to 10701")
         luup.variable_set(MYSID, "MessageExpr", "", dev)
+    end
+    
+    if rev < 10900 then
+        D("runOnce() Upgrading config to 10900")
+        luup.attr_set( "category_num", 4, dev )
+        luup.attr_set( "subcategory_num", "", dev )
     end
     
     -- No matter what happens above, if our versions don't match, force that here/now.
