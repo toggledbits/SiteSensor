@@ -12,7 +12,7 @@
 module("L_SiteSensor1", package.seeall)
 
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.8develop"
+local _PLUGIN_VERSION = "1.8stable180702"
 local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 10900
 

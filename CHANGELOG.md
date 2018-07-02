@@ -1,6 +1,6 @@
 # CHANGELOG #
 
-## Version 1.8 ##
+## Version 1.8 (stable branch) ##
 
 * Make category and subcategory assignment more definitive.
 * References to non-existent subkeys now do not issue runtime error, but return null. This allows functions like `if()` to check for and gently handle missing data (e.g. OpenWeatherMap.org does not always return wind data in its API response). This is actually a change made entirely to luaxp; the version of luaxp used by SiteSensor has been updated;
