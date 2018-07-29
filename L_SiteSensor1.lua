@@ -11,8 +11,9 @@
 
 module("L_SiteSensor1", package.seeall)
 
+local _PLUGIN_ID = 8942
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.8stable180702"
+local _PLUGIN_VERSION = "1.9"
 local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 10900
 
@@ -179,7 +180,6 @@ local function trip(tripped, dev)
         if tripped then
             D("trip() marking tripped")
             newVal = "1"
-            luup.variable_set(SSSID, "LastTrip", os.time(), dev)
         else
             D("trip() marking not tripped")
             newVal = "0"
@@ -733,10 +733,8 @@ local function runOnce(dev)
         luup.variable_set(MYSID, "LogRequests", "0", dev)
         luup.variable_set(MYSID, "EvalInterval", "", dev)
 
-        luup.variable_set(SSSID, "LastTrip", "0", dev)
         luup.variable_set(SSSID, "Armed", "0", dev)
         luup.variable_set(SSSID, "Tripped", "0", dev)
-        luup.variable_set(SSSID, "ArmedTripped", "0", dev)
         luup.variable_set(SSSID, "AutoUntrip", "0", dev)
         
         luup.variable_set(HASID, "ModeSetting", "1:;2:;3:;4:", dev )

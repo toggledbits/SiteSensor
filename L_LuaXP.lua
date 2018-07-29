@@ -11,7 +11,8 @@ module("L_LuaXP", package.seeall)
 
 local _M = {}
 
-_VERSION = "0.9.5S"
+_VERSION = "0.9.6S" -- Special reactor version
+_VNUMBER = 000906
 _DEBUG = false -- Caller may set boolean true or function(msg)
 
 -- Binary operators and precedence (lower prec is higher precedence)
@@ -989,7 +990,11 @@ local function fetch( stack, ctx )
         else
             v = ctx[e.name]
         end
-        if (v == nil) then evalerror("Undefined variable: " .. e.name, e.pos) end
+        if v == nil and (ctx.__functions or {}).__resolve ~= nil then
+            D("fetch: calling external resolver for %1", e.name)
+            v = ctx.__functions.__resolve( e.name, ctx )
+        end
+        if v == nil then evalerror("Undefined variable: " .. e.name, e.pos) end
         -- Apply array index if present
         if (e.index ~= nil) then
             if base.type(v) ~= "table" then evalerror(e.name .. " is not an array", e.pos) end
