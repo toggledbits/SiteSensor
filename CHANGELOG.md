@@ -1,6 +1,6 @@
 # CHANGELOG #
 
-## Version 1.8 (development) ##
+## Version 1.9 (released) ##
 
 * Make category and subcategory assignment more definitive.
 * References to non-existent subkeys now do not issue runtime error, but return null. This allows functions like `if()` to check for and gently handle missing data (e.g. OpenWeatherMap.org does not always return wind data in its API response). This is actually a change made entirely to luaxp; the version of luaxp used by SiteSensor has been updated;
@@ -9,10 +9,12 @@
 * Let Vera manage `ArmedTripped` entirely. This gives SiteSensor Vera's semantics for `ArmedTripped` (i.e. `ArmedTripped` only changes state at edges of `Tripped` when `Armed`=1; it is not reset to 0 when `Armed` is changed from 1 to 0 while `Tripped`=1, nor set to 1 when `Armed` is changed from 0 to 1 while `Tripped`=1);
 * Remove reference to makersupport.com for donations (they are currently defunct, unable to process payments), and direct would-be donors to a page on my web site.
 
-## Version 1.7 (released) ##
+## Version 1.8 (released) ##
 Released for openLuup only
 
 * Fix namespace in XML header to comply with requirements of akbooer's new XML parser. This change affects openLuup only.
+
+## Version 1.7 (skipped) ##
 
 ## Version 1.6 (released) ##
 
