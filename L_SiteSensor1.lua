@@ -11,10 +11,11 @@
 
 module("L_SiteSensor1", package.seeall)
 
+local _PLUGIN_ID = 8942
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.8"
+local _PLUGIN_VERSION = "1.9"
 local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
-local _CONFIGVERSION = 10701
+local _CONFIGVERSION = 10900
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local MYTYPE = "urn:schemas-toggledbits-com:device:SiteSensor:1"
@@ -179,7 +180,6 @@ local function trip(tripped, dev)
         if tripped then
             D("trip() marking tripped")
             newVal = "1"
-            luup.variable_set(SSSID, "LastTrip", os.time(), dev)
         else
             D("trip() marking not tripped")
             newVal = "0"
@@ -733,13 +733,14 @@ local function runOnce(dev)
         luup.variable_set(MYSID, "LogRequests", "0", dev)
         luup.variable_set(MYSID, "EvalInterval", "", dev)
 
-        luup.variable_set(SSSID, "LastTrip", "0", dev)
         luup.variable_set(SSSID, "Armed", "0", dev)
         luup.variable_set(SSSID, "Tripped", "0", dev)
-        luup.variable_set(SSSID, "ArmedTripped", "0", dev)
         luup.variable_set(SSSID, "AutoUntrip", "0", dev)
         
         luup.variable_set(HASID, "ModeSetting", "1:;2:;3:;4:", dev )
+        
+        luup.attr_set( "category_num", 4, dev )
+        luup.attr_set( "subcategory_num", "", dev )
         
         luup.variable_set(MYSID, "Version", _CONFIGVERSION, dev)
         return
@@ -757,8 +758,14 @@ local function runOnce(dev)
     end
     
     if rev < 10701 then
-        D("runOne() Upgrading config to 10701")
+        D("runOnce() Upgrading config to 10701")
         luup.variable_set(MYSID, "MessageExpr", "", dev)
+    end
+    
+    if rev < 10900 then
+        D("runOnce() Upgrading config to 10900")
+        luup.attr_set( "category_num", 4, dev )
+        luup.attr_set( "subcategory_num", "", dev )
     end
     
     -- No matter what happens above, if our versions don't match, force that here/now.
