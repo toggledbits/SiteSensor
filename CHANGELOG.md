@@ -1,5 +1,7 @@
 # CHANGELOG #
 
+## Version 1.10 (develop branch) ##
+
 ## Version 1.9 (released) ##
 
 * Make category and subcategory assignment more definitive.
