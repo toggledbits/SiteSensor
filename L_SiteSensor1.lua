@@ -565,6 +565,7 @@ local function doEval( dev, ctx )
 
     -- Valid response. Let's parse it and set our variables.
     ctx.expr = {}
+    ctx.__options = { nullderefnull=true, subscriptmissnull=true } -- be very "loose"
     for i = 1,8 do
         local r = nil
         local ex = luup.variable_get(MYSID, "Expr" .. tostring(i), dev)
