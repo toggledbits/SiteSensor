@@ -1196,7 +1196,7 @@ local function startProbe( probe )
     probeRunOnce( probe )
     
     -- Schedule next query.
-    scheduleNext( probe, nil, { func=runQuery } )
+    scheduleNext( probe, nil, { id=tostring(probe), owner=probe, func=runQuery } )
     
     return true
 end
