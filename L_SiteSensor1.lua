@@ -11,6 +11,8 @@
 
 module("L_SiteSensor1", package.seeall)
 
+local debugMode = false
+
 local _PLUGIN_ID = 8942
 local _PLUGIN_NAME = "SiteSensor"
 local _PLUGIN_VERSION = "1.10develop"
@@ -30,7 +32,6 @@ local tickTasks = {}
 
 local isALTUI = false
 local isOpenLuup = false
-local debugMode = true
 
 local logCapture = {}
 local logMax = 50
@@ -38,7 +39,7 @@ local logMax = 50
 local https = require("ssl.https")
 local http = require("socket.http")
 local ltn12 = require("ltn12")
-local dkjson = require('dkjson')
+local json = require('dkjson')
 local luaxp = require("L_LuaXP")
 
 local function dump(t)
@@ -49,8 +50,6 @@ local function dump(t)
         local val
         if type(v) == "table" then
             val = dump(v)
-        elseif type(v) == "function" then
-            val = "(function)"
         elseif type(v) == "string" then
             val = string.format("%q", v)
         else
@@ -85,17 +84,24 @@ local function L(msg, ...)
         end
     )
     luup.log(str, level)
-    if type(msg) == "string" then -- don't capture debug
-        table.insert( logCapture, os.date("%X") .. ": " .. str )
-        if #logCapture > logMax then table.remove( logCapture, 1 ) end
-        luup.variable_set( PRSID, "LogCapture", table.concat( logCapture, "|" ), luup.device )
-    end
+    return str, level
 end
 
 local function D(msg, ...)
     if debugMode then
         L( { msg=msg,prefix=_PLUGIN_NAME .. "(debug)::" }, ... )
     end
+end
+
+-- Capture log
+local function C(dev, msg, ...)
+    assert(type(dev)=="number")
+    local child = tostring(dev)
+    local str = L(msg,...)
+    if logCapture[child] == nil then logCapture[child] = {} end
+    table.insert( logCapture[child], os.date("%X") .. ": " .. str )
+    if #logCapture[child] > logMax then table.remove( logCapture[child], 1 ) end
+    luup.variable_set( PRSID, "LogCapture", table.concat( logCapture[child], "|" ), dev )
 end
 
 local function split( str, sep )
@@ -107,19 +113,19 @@ local function split( str, sep )
     return arr, #arr
 end
 
-local function parseRefExpr(ex, ctx)
+local function parseRefExpr(ex, ctx, dev)
     D("parseRefExpr(%1,ctx)", ex, ctx)
     local cx, err
     cx, err = luaxp.compile(ex,ctx)
     if cx == nil then
-        L("Failed to parse expression `%1', %2", ex, err)
+        C(dev, "Failed to parse expression `%1', %2", ex, err)
         return nil
     end
 
     local val
     val, err = luaxp.run(cx, ctx)
     if val == nil then
-        L("Failed to execute `%1', %2", ex, err)
+        C(dev, "Failed to execute `%1', %2", ex, err)
     end
     return val
 end
@@ -255,7 +261,7 @@ function scheduleNext(dev, delay, taskinfo)
             delay = getVarNumeric("ArmedInterval", delay, dev, PRSID)
         end
         D("scheduleNext() interval is %1", delay)
-        
+
         -- Now, see if we've missed an interval
         local nextQuery = getVarNumeric("LastQuery", 0, dev, PRSID) + delay
         local now = os.time()
@@ -270,7 +276,7 @@ function scheduleNext(dev, delay, taskinfo)
             delay = nextDelay
         end
     end
-    
+
     -- See if we're doing eval ticks (rerunning evals between requests)
     local qtype = luup.variable_get(PRSID, "ResponseType", dev) or "text"
     if qtype == "json" then
@@ -280,11 +286,11 @@ function scheduleNext(dev, delay, taskinfo)
             delay = evalTick
         end
     end
-    
+
     -- Book it.
     if delay < 1 then delay = 1 end
     L("Next activity in %1 seconds", delay)
-    scheduleDelay( taskinfo and taskinfo or dev, delay )
+    scheduleDelay( taskinfo and taskinfo or tostring(dev), delay )
 end
 
 local function b64encode( d )
@@ -308,7 +314,7 @@ local function urldecode( str )
     str = tostring(str)
     str = str:gsub("%+", " ")
     return str:gsub("%%(..)", function( c ) return string.char(tonumber(c,16)) end)
-end   
+end
 
 -- Return the current timezone offset adjusted for DST
 local function tzoffs()
@@ -324,7 +330,7 @@ local function substitution( str, enc, dev )
         , isodate = function( e ) return os.date("%Y-%m-%d") end
         , isotime = function( e ) return os.date("%H:%M:%S") end
           -- tzoffset returns timezone offset in ISO 8601-like format, -0500
-        , tzoffset = function( e, d ) local offs = tzoffs() / 60 local mag = math.abs(offs) local sg = offs < 0 local c = '+' if sg then c = '-' end return string.format("%s%02d%02d", c, mag / 60, mag % 60) end 
+        , tzoffset = function( e, d ) local offs = tzoffs() / 60 local mag = math.abs(offs) local sg = offs < 0 local c = '+' if sg then c = '-' end return string.format("%s%02d%02d", c, mag / 60, mag % 60) end
           -- tzdelta returns timezone offset formatted like -5hours (PHP-compatible date offset)
         , tzrel = function( e, d ) local offs = tzoffs / 60 return string.format("%+dhours", offs / 60) end
         , device = function( e, d ) return d end
@@ -336,7 +342,7 @@ local function substitution( str, enc, dev )
     }
     if str == nil then return nil end
     str = tostring(str)
-    str = str:gsub("(%[[^%]]+%])", function( e ) 
+    str = str:gsub("(%[[^%]]+%])", function( e )
             e = e:sub( 2, -2 ):lower()
             local f = e:gsub(":.*$", "")
             local s
@@ -370,11 +376,13 @@ local function doRequest(url, method, body, dev)
 
     -- Build post/put data
     if type(body) == "table" then
-        body = dkjson.encode(body)
+        body = json.encode(body)
         tHeaders["Content-Type"] = "application/json"
+        src = ltn12.source.string(body)
     end
     if body ~= nil then
         tHeaders["Content-Length"] = string.len(body)
+        tHeaders["Content-Type"] = "application/x-www-form-urlencoded"
         src = ltn12.source.string(body)
     else
         src = nil
@@ -404,7 +412,7 @@ local function doRequest(url, method, body, dev)
     local r = {}
     http.TIMEOUT = timeout -- N.B. http not https, regardless
     if logRequest then
-        L("%2 %1, headers=%3", url, method, tHeaders)
+        C(dev, "%2 %1, headers=%3", url, method, tHeaders)
     end
     respBody, httpStatus = requestor.request{
         url = url,
@@ -420,9 +428,9 @@ local function doRequest(url, method, body, dev)
     respBody = table.concat(r)
 
     if logRequest then
-        L("Response HTTP status %1, body=" .. respBody, httpStatus) -- use concat to avoid quoting
+        C(dev, "Response HTTP status %1, body=" .. respBody, httpStatus) -- use concat to avoid quoting
     end
-    
+
     -- Handle special errors from socket library
     if tonumber(httpStatus) == nil then
         respBody = httpStatus
@@ -451,9 +459,9 @@ local function doMatchQuery( dev )
     local matched = false
     local err = false
     local matchValue
-    
+
     -- Clear log capture for new request
-    logCapture = {}
+    logCapture[tostring(dev)] = {}
     setMessage("Performing query...", dev)
 
     -- Perform on-the-fly substitution of request values
@@ -485,7 +493,7 @@ local function doMatchQuery( dev )
     -- connection as soon as we find our pattern string.
     http.TIMEOUT = timeout
     if logRequest then
-        L("HTTP %2 %1, headers=%3", url, method, tHeaders)
+        C(dev, "HTTP %2 %1, headers=%3", url, method, tHeaders)
     end
     cond, httpStatus, httpHeaders = requestor.request {
         method = method,
@@ -535,7 +543,7 @@ local function doMatchQuery( dev )
     ]]
     D("doMatchQuery() returned from request(), cond=%1, httpStatus=%2, httpHeaders=%3", cond or "nil", httpStatus, httpHeaders)
     if logRequest then
-        L("Response status %1 with matched %2", httpStatus, matched)
+        C(dev, "Response status %1 with matched %2", httpStatus, matched)
     end
 
     -- Handle special errors from socket library
@@ -573,7 +581,7 @@ local function doMatchQuery( dev )
         newTrip = matched
     end
     trip(newTrip, dev)
-    
+
     -- Clear LastResponse, which is only used for JSON requests
     luup.variable_set( PRSID, "LastResponse", "", dev )
 end
@@ -581,23 +589,23 @@ end
 local function doEval( dev, ctx )
     local logRequest = (getVarNumeric("LogRequests", 0, dev, PRSID) ~= 0) or debugMode
     local numErrors = 0
-    
+
     -- Since we got a valid response, indicate not tripped, unless using TripExpression, then that.
     -- Reset state var for (in)valid response?
     setMessage("Retrieving last response...", dev)
-    
-    if ctx == nil then 
+
+    if ctx == nil then
         local lr = luup.variable_get( PRSID, "LastResponse", dev ) or ""
-        if lr == "" then    
-            L("No prior response to evaluate.")
+        if lr == "" then
+            C(dev, "No prior response to evaluate.")
             setMessage( "Empty or invalid response data.", dev )
             fail( true, dev )
             return
         end
         local pos, err
-        ctx, pos, err = dkjson.decode( lr )
+        ctx, pos, err = json.decode( lr )
         if err then
-            L("Unable parse stored prior result. That's... unexpected. %1 at %2", err, pos)
+            C(dev, "Unable parse stored prior result. That's... unexpected. %1 at %2", err, pos)
             setMessage( "Invalid JSON in response.", dev )
             fail( true, dev )
             return
@@ -624,10 +632,10 @@ local function doEval( dev, ctx )
         if not logRequest then D("doEval() Expr%1=%2", i, ex or "nil") end
         if ex ~= nil then
             if string.len(ex) > 0 then
-                r = parseRefExpr(ex, ctx)
-                if logRequest then L("Eval #%1: %2=(%3)%4", i, ex, type(r), r) end
+                r = parseRefExpr(ex, ctx, dev)
+                if logRequest then C(dev, "Eval #%1: %2=(%3)%4", i, ex, type(r), r) end
                 D("doEval() parsed value of %1 is %2", ex, tostring(r))
-                if r == nil then    
+                if r == nil then
                     numErrors = numErrors + 1
                 end
             end
@@ -649,7 +657,7 @@ local function doEval( dev, ctx )
 
         -- Add raw result to context (available to subsequent expressions)
         ctx.expr[i] = r -- raw, not canonical
-        
+
         -- Save to device state if changed.
         local oldVal = luup.variable_get(PRSID, "Value" .. tostring(i), dev)
         D("doEval() newval=(%1)%2 canonical %3, oldVal=%4", type(r), r, rv, oldVal)
@@ -666,10 +674,10 @@ local function doEval( dev, ctx )
     if ttype == "expr" then
         D("doEval() parsing TripExpression %1", texp)
         local r = nil
-        if texp ~= nil then r = parseRefExpr(texp, ctx) end
+        if texp ~= nil then r = parseRefExpr(texp, ctx, dev) end
         if r == nil then numErrors = numErrors + 1 end
         D("doEval() TripExpression result is %1", r)
-        if logRequest then L("Eval trip expression: %1=(%2)%3", texp, type(r), r) end
+        if logRequest then C(dev, "Eval trip expression: %1=(%2)%3", texp, type(r), r) end
         if r == nil
             or ( type(r) == "boolean" and r == false )
             or ( type(r) == "number" and r == 0 )
@@ -696,7 +704,7 @@ local function doEval( dev, ctx )
         if msgExpr == "" then
             msg = "Last query succeeded!"
         else
-            msg = parseRefExpr(msgExpr, ctx)
+            msg = parseRefExpr(msgExpr, ctx, dev)
             if msg == nil then msg = "?" end
         end
         fail( false, dev )
@@ -709,12 +717,12 @@ local function doJSONQuery(dev)
     local logRequest = (getVarNumeric("LogRequests", 0, dev, PRSID) ~= 0) or debugMode
     local url = luup.variable_get(PRSID, "RequestURL", dev) or ""
     local ttype = luup.variable_get(PRSID, "Trigger", dev) or "err"
-    
+
     -- Clear log capture for new request
-    logCapture = {}
+    logCapture[tostring(dev)] = {}
 
     setMessage("Requesting JSON...", dev)
-    if logRequest then L("Requesting JSON data") end
+    if logRequest then C(dev, "Requesting JSON data") end
     local err,body,httpStatus = doRequest(url, "GET", nil, dev)
     local ctx = { response={}, status={ timestamp=os.time(), valid=0, httpStatus=httpStatus } }
     if body == nil or err then
@@ -725,14 +733,14 @@ local function doJSONQuery(dev)
     else
         D("doJSONQuery() fixing up JSON response for parsing")
         setMessage("Parsing response...", dev)
-        -- Fix booleans, which dkjson doesn't seem to understand (gives nil)
+        -- Fix booleans, which json doesn't seem to understand (gives nil)
         body = string.gsub( body, ": *true *,", ": 1," )
         body = string.gsub( body, ": *false *,", ": 0," )
 
         -- Process JSON response. First parse response.
-        local t, pos, e = dkjson.decode(body)
+        local t, pos, e = json.decode(body)
         if e then
-            L("Unable to decode JSON response, %2 (dev %1)", dev, e)
+            C(dev, "Unable to decode JSON response, %2 (dev %1)", dev, e)
             -- If TripExpression isn't used, trip follows status
             fail(true, dev)
             if ttype == "err" then trip(true, dev) end
@@ -746,9 +754,9 @@ local function doJSONQuery(dev)
             ctx.status.jsonStatus = "OK"
             ctx.response = t
             fail(false, dev)
-            
+
             -- Save the response
-            luup.variable_set( PRSID, "LastResponse", dkjson.encode( ctx ), dev )
+            luup.variable_set( PRSID, "LastResponse", json.encode( ctx ), dev )
         end
     end
 
@@ -772,12 +780,12 @@ local function runOnce(dev)
         D("runOnce() Performing first-time initialization!")
         luup.variable_set(MYSID, "Message", "", dev)
         luup.variable_set(MYSID, "DebugMode", 0, dev)
-       
+
         luup.attr_set( "category_num", 1, dev )
         luup.attr_set( "subcategory_num", "", dev )
-        
+
         luup.variable_set(MYSID, "Version", _CONFIGVERSION, dev)
-        return
+        return true
     end
 
     L("Applying config upgrades to plugin to version %1", _CONFIGVERSION)
@@ -785,6 +793,7 @@ local function runOnce(dev)
         -- Conversion to 1.10. Find all SiteSensors incl this one and create a child
         -- of this one for it. Link it via the OldDevice state variable, which
         -- we'll detect separately.
+        L({level=2,msg="Upgrading plugin to 11000... creating child devices, %1 is now master"}, dev)
         luup.attr_set( "category_num", 1, dev ) -- Force category on new master
         luup.attr_set( "subcategory_num", "", dev )
         local ptr = luup.chdev.start( dev )
@@ -808,43 +817,57 @@ local function runOnce(dev)
         end
         D("plugin_runOnce() created %1 child devices", count)
         luup.chdev.sync( dev, ptr )
-        L("RELOADING LUUP!")
-        luup.reload()
+        return false
     end
 
     -- No matter what happens above, if our versions don't match, force that here/now.
     if (rev ~= _CONFIGVERSION) then
         luup.variable_set(MYSID, "Version", _CONFIGVERSION, dev)
     end
+    return true
 end
 
 local function remapScene( scene, old, new )
     D("remapScene(%1,%2,%3)", scene, old, new)
     -- ??? No openLuup support here.
     local reqURL = isOpenLuup and "http://127.0.0.1:3480" or "http://127.0.0.1/port_3480"
-    local s = luup.inet.wget( reqURL .. "/data_request?id=scene&action=list&scene=" .. scene)
+    local st,s,httpStatus = doRequest( reqURL .. "/data_request?id=scene&action=list&scene=" .. scene, "GET", nil, new )
+    D("remapScene() request result %1 data %2", httpStatus, s)
     local sd,pos,err = json.decode(s)
     if sd and not err then
+        D("remapScene() sd is %1", sd)
+        local stold = tostring(old)
         local changed = false
         for _,t in ipairs( sd.triggers or {} ) do
-            if t.device == old then 
-                t.device = new 
-                changed = true 
+            D("remapScene() checking trigger %1 device %2==%3?", t, t.device, stold)
+            if t.device == stold then
+                t.device = tostring(new)
+                changed = true
             end
         end
         if changed then
-            D("remapScene() saving modified scene %1 (%2)", sd.id, sd.name)
             -- POST for long data
             if not sd.id then sd.id = scene end
-            local ux = json.encode(sd).gsub( "([&%= ])", function( c ) return string.format("%%%02x", string.byte( c )) end )
+            local ux = json.encode(sd) 
+            ux = ux:gsub( "([&%= ])", function( c ) return string.format("%%%02x", string.byte( c )) end )
+            D("remapScene() saving modified scene %1 (%2) %3", sd.id, sd.name, ux)
             doRequest( reqURL .. "/data_request", "POST", "id=scene&action=create&json=" .. ux, new )
+            -- Schedule luup restart. Using replace flag allows subsequent calls to push it out.
+            scheduleDelay( { id="reload", func=luup.reload, owner=new }, 30, { replace=true } )
+            L({level=2,msg="Scene %1 (%2) has been modified to reflect a SiteSensor device change (from %3 to %4) in its triggers. A Luup restart is being scheduled."},
+                sd.id, sd.name, old, new)
         end
+    else
+        D("Didn't load scene from %1, %2 at %3", s, err, pos)
     end
 end
 
-local function remapScenes( old, new )
+-- Task receiver to remap scenes
+local function remapScenes( owner, taskid, p )
+    D("remapScenes(%1,%2,%3)", owner, taskid, p)
     for k,v in pairs( luup.scenes ) do
-        pcall( remapScene, old, new )
+        status, err = pcall( remapScene, k, p.old, p.new )
+        if not status then L({level=1,msg="remapScene(%1,%2,%3) failed, %4"}, k, p.old, p.new, err) end
     end
 end
 
@@ -858,12 +881,16 @@ local function probeRunOnce( tdev )
         -- See if this child is upgrading from old plugin instance
         local old = getVarNumeric( "OldDevice", 0, tdev, PRSID )
         if old > 0 then
-            L("Probe %1 (%2) first run, copying from old instance %3...", tdev, luup.devices[tdev].description, old)
+            L("Probe %1 (%2) new child first run, copying from old instance %3...", tdev, luup.devices[tdev].description, old)
             local v = {'Message','RequestURL','Interval','Timeout','QueryArmed',
                 'QueryArmed','ResponseType','Trigger','Failed','LastQuery','LastRun',
-                'LogRequests','EvalInterval','LastResponse'}
+                'LogRequests','LogCapture','EvalInterval','LastResponse','TripExpression'}
             for _,varname in ipairs(v) do
                 luup.variable_set( PRSID, varname, luup.variable_get( MYSID, varname, old ) or "", tdev )
+            end
+            for k = 1, 8 do
+                luup.variable_set( PRSID, "Expr" .. k, luup.variable_get( MYSID, "Expr" .. k, old ) or "", tdev )
+                luup.variable_set( PRSID, "Value" .. k, luup.variable_get( MYSID, "Value" .. k, old ) or "", tdev )
             end
             luup.attr_set( "room", luup.attr_get( "room", old ) or 0, tdev )
             for _,varname in ipairs({'Armed','Tripped','AutoUntrip'}) do
@@ -876,15 +903,17 @@ local function probeRunOnce( tdev )
             luup.attr_set( "category_num", 4, tdev )
             luup.attr_set( "subcategory_num", "", tdev )
             luup.variable_set( PRSID, "Message", "", tdev ) -- force blank start
-            
+
             -- Disable old device.
             luup.variable_set( MYSID, "Enabled", 0, old )
             luup.variable_set( MYSID, "QueryArmed", 1, old )
             luup.variable_set( SSSID, "Armed", 0, old )
-            
-            -- Attempt to fix scenes that refer to this device
-            remapScenes( old, tdev )
-            
+
+            -- Attempt to fix scenes that refer to this device. Defer the actual work, because Vera is often
+            -- still too busy to answer Luup requests (which we have to use because scene data isn't accessible
+            -- any other way (BLECH).
+            scheduleDelay( { id="remap"..tdev, func=remapScenes, args={ old=old, new=tdev }, owner=tdev }, 60 )
+
             -- Flag that we're done here.
             luup.variable_set( PRSID, "OldDevice", "", tdev )
             -- deleteVar( PRSID, "OldDevice", tdev )
@@ -907,9 +936,9 @@ local function probeRunOnce( tdev )
             luup.variable_set(SSSID, "Armed", "0", tdev)
             luup.variable_set(SSSID, "Tripped", "0", tdev)
             luup.variable_set(SSSID, "AutoUntrip", "0", tdev)
-            
+
             luup.variable_set(HASID, "ModeSetting", "1:;2:;3:;4:", tdev )
-            
+
             luup.attr_set( "category_num", 4, tdev )
             luup.attr_set( "subcategory_num", "", tdev )
             luup.variable_set(PRSID, "Version", _CONFIGVERSION, tdev)
@@ -924,17 +953,17 @@ local function probeRunOnce( tdev )
         luup.variable_set(PRSID, "EvalInterval", "", tdev)
         luup.variable_set(HASID, "ModeSetting", "1:;2:;3:;4:", tdev )
     end
-    
+
     if s < 10700 then
         D("probeRunOnce() Upgrading config to 10700")
         luup.variable_set(SSSID, "AutoUntrip", "0", tdev)
     end
-    
+
     if s < 10701 then
         D("probeRunOnce() Upgrading config to 10701")
         luup.variable_set(PRSID, "MessageExpr", "", tdev)
     end
-    
+
     if s < 10900 then
         D("probeRunOnce() Upgrading config to 10900")
         luup.attr_set( "category_num", 4, tdev )
@@ -951,7 +980,7 @@ end
 -- format as "stamp:devno"
 function runQuery(dev)
     D("runQuery(%1)", dev)
-    
+
     -- Are we doing an eval tick, or running a request?
     local qtype = luup.variable_get(PRSID, "ResponseType", dev) or "text"
     local timeNow = os.time()
@@ -986,7 +1015,7 @@ function runQuery(dev)
         -- Not time, but for JSON we may do an eval if re-eval ticks are enabled.
         local evalTick = getVarNumeric( "EvalInterval", 0, dev, PRSID )
         if evalTick > 0 then
-            L("Performing re-evaluation of prior response")
+            C(dev, "Performing re-evaluation of prior response")
             doEval( dev ) -- pass no context, doEval will reproduce it
         end
     end
@@ -1026,28 +1055,29 @@ function requestLogging( dev, enabled )
     D("requestLogging(%1,%2)", dev, enabled )
     if enabled then
         luup.variable_set( PRSID, "LogRequests", "1", dev )
-        L("Request logging enabled. Detailed logging will begin at next request/eval.")
+        C(dev, "Request logging enabled. Detailed logging will begin at next request/eval.")
     else
         luup.variable_set( PRSID, "LogRequests", "0", dev )
+        logCapture[tostring(dev)] = nil -- free up for gc
     end
 end
 
 function actionSetDebug( dev, state )
     D("actionSetDebug(%1,%2)", dev, state)
-    if state == 1 or state == "1" or state == true or state == "true" then 
-        debugMode = true 
+    if state == 1 or state == "1" or state == true or state == "true" then
+        debugMode = true
         D("actionSetDebug() debug logging enabled")
     end
 end
 
-function actionAddSensor( pdev )
-    D("actionAddSensor(%1)", pdev)
+function actionAddProbe( pdev )
+    D("actionAddProbe(%1)", pdev)
     local ptr = luup.chdev.start( pdev )
     local highd = 0
-    luup.variable_set( MYSID, "Message", "Adding probe. Please hard-refresh your browser.", pdev )
+    luup.variable_set( MYSID, "Message", "Adding probe. Please hard-reload your browser (CTRL-F5, or Command-Shift-R on Mac).", pdev )
     for _,v in pairs(luup.devices) do
         if v.device_type == PRTYPE and v.device_num_parent == pdev then
-            D("actionAddSensor() appending existing device %1 (%2)", v.id, v.description)
+            D("actionAddProbe() appending existing device %1 (%2)", v.id, v.description)
             local dd = tonumber( string.match( v.id, "t(%d+)" ) )
             if dd == nil then highd = highd + 1 elseif dd > highd then highd = dd end
             luup.chdev.append( pdev, ptr, v.id, v.description, "",
@@ -1055,8 +1085,8 @@ function actionAddSensor( pdev )
         end
     end
     highd = highd + 1
-    D("actionAddSensor() creating child d%1t%2", pdev, highd)
-    luup.chdev.append( pdev, ptr, string.format("d%dt%d", pdev, highd),
+    D("actionAddProbe() creating child d%1t%2", pdev, highd)
+    luup.chdev.append( pdev, ptr, string.format("p%dt%d", pdev, highd),
         "SiteSensor Probe " .. highd, "", "D_SiteSensorProbe1.xml", "", "", false )
     luup.chdev.sync( pdev, ptr )
     -- Should cause reload immediately.
@@ -1064,7 +1094,7 @@ end
 
 local function getDevice( dev, pdev, v )
     if v == nil then v = luup.devices[dev] end
-    local devinfo = { 
+    local devinfo = {
           devNum=dev
         , ['type']=v.device_type
         , description=v.description or ""
@@ -1079,11 +1109,11 @@ local function getDevice( dev, pdev, v )
     }
     local rc,t,httpStatus
     rc,t,httpStatus = luup.inet.wget("http://localhost/port_3480/data_request?id=status&DeviceNum=" .. dev .. "&output_format=json", 15)
-    if httpStatus ~= 200 or rc ~= 0 then 
+    if httpStatus ~= 200 or rc ~= 0 then
         devinfo['_comment'] = string.format( 'State info could not be retrieved, rc=%d, http=%d', rc, httpStatus )
         return devinfo
     end
-    local d = dkjson.decode(t)
+    local d = json.decode(t)
     local key = "Device_Num_" .. dev
     if d ~= nil and d[key] ~= nil and d[key].states ~= nil then d = d[key].states else d = nil end
     devinfo.states = d or {}
@@ -1103,13 +1133,13 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
         -- ImperiHome ISS Standard System API, see http://dev.evertygo.com/api/iss#types
         local path = lul_parameters['path'] or action:sub( 4 ) -- Work even if I'home user forgets &path=
         if path == "/system" then
-            return dkjson.encode( { id="SiteSensor-" .. luup.pk_accesspoint, apiversion=1 } ), "application/json"
+            return json.encode( { id="SiteSensor-" .. luup.pk_accesspoint, apiversion=1 } ), "application/json"
         elseif path == "/rooms" then
             local roomlist = { { id=0, name="No Room" } }
-            for rn,rr in pairs( luup.rooms ) do 
+            for rn,rr in pairs( luup.rooms ) do
                 table.insert( roomlist, { id=rn, name=rr } )
             end
-            return dkjson.encode( { rooms=roomlist } ), "application/json"
+            return json.encode( { rooms=roomlist } ), "application/json"
         elseif path == "/devices" then
             local devices = {}
             for lnum,ldev in pairs( luup.devices ) do
@@ -1127,7 +1157,7 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
                     }
                     if (ldev.room_num or 0) ~= 0 then dev.room = tostring(ldev.room_num) end
                     table.insert( devices, dev )
-                    
+
                     -- Make a device for each formula that stores a value (if any). Skip empties.
                     for k = 1,8 do
                         local frm = luup.variable_get( PRSID, "Expr" .. k, lnum ) or ""
@@ -1146,15 +1176,15 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
                     end
                 end
             end
-            return dkjson.encode( { devices=devices } ), "application/json"
+            return json.encode( { devices=devices } ), "application/json"
         else
             D("requestHandler: command %1 not implemented, ignored", action)
             return "{}", "application.json"
         end
     end
-    
+
     if action == "status" then
-        if dkjson == nil then return "Missing dkjson library", "text/plain" end
+        if json == nil then return "Missing json library", "text/plain" end
         local st = {
             name=_PLUGIN_NAME,
             version=_PLUGIN_VERSION,
@@ -1169,7 +1199,7 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
                 isOpenLuup=isOpenLuup,
                 isALTUI=isALTUI,
                 units=luup.attr_get( "TemperatureFormat", 0 ),
-            },            
+            },
             devices={}
         }
         st.luaxp_version = luaxp._VERSION or "?"
@@ -1179,12 +1209,12 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
                 table.insert( st.devices, devinfo )
             end
         end
-        return dkjson.encode( st ), "application/json"
+        return json.encode( st ), "application/json"
     end
-    
+
     return "<html><head><title>" .. _PLUGIN_NAME .. " Request Handler"
         .. "</title></head><body bgcolor='white'>Request format: <tt>http://" .. (luup.attr_get( "ip", 0 ) or "...")
-        .. "/port_3480/data_request?id=lr_" .. lul_request 
+        .. "/port_3480/data_request?id=lr_" .. lul_request
         .. "&action=</tt><p>Actions: status, debug, ISS"
         .. "<p>Imperihome ISS URL: <tt>...&action=ISS&path=</tt><p>Documentation: <a href='"
         .. _PLUGIN_URL .. "' target='_blank'>" .. _PLUGIN_URL .. "</a></body></html>"
@@ -1194,10 +1224,10 @@ end
 local function startProbe( probe )
     -- One-time initialization for child.
     probeRunOnce( probe )
-    
+
     -- Schedule next query.
     scheduleNext( probe, nil, { id=tostring(probe), owner=probe, func=runQuery } )
-    
+
     return true
 end
 
@@ -1261,7 +1291,7 @@ function taskTick( p )
         local delay = nextTick - now
         if delay < 1 then delay = 1 end
         tickTasks._plugin.when = now + delay
-        D("taskTick() scheduling next tick(%3) for %1 (%2)", delay, tickTasks._plugin.when, p)
+        D("taskTick() scheduling next taskTick(%3) for %1 (%2)", delay, tickTasks._plugin.when, p)
         luup.call_delay( "siteSensorTick", delay, p )
     else
         D("taskTick() not rescheduling, nextTick=%1, stepStamp=%2, runStamp=%3", nextTick, stepStamp, runStamp)
@@ -1272,20 +1302,20 @@ end
 function pluginInit(dev)
     D("pluginInit(%1)", dev)
     L("starting plugin version %1 master device %2", _PLUGIN_VERSION, dev)
-    
+
     if luup.variable_get( MYSID, "Converted", dev ) == "1" then
-        L("This instance %1 (%2) has been converted to a child device; This device should be deleted. See http://forum.micasaverde.com/index.php/topic,50440.0.html",
+        L({level=2,msg="Instance %1 (%2) has been converted to a child device; This device should be deleted. See http://forum.micasaverde.com/index.php/topic,50440.0.html"},
             dev, luup.devices[dev].description)
         luup.variable_set( MYSID, "Failed", 1, dev)
-        setMessage( "Message", "Device upgraded/replaced. Delete this one!", dev )
-        set_failure( true, dev )
+        luup.variable_set( MYSID, "Message", "Device upgraded/replaced. Delete this one!", dev )
+        luup.set_failure( true, dev )
         return false, "Upgraded/replaced", _PLUGIN_NAME
     end
 
     -- Initialize instance data
     pluginDevice = dev
     tickTasks = {}
-    
+
     -- Debug?
     if getVarNumeric( "DebugMode", 0, dev, MYSID ) ~= 0 then
         debugMode = true
@@ -1297,17 +1327,17 @@ function pluginInit(dev)
         if v.device_type == "urn:schemas-upnp-org:device:altui:1" then
             D("init() detected ALTUI at %1", k)
             isALTUI = true
-            local rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin", 
-                { 
-                    newDeviceType=MYTYPE, 
-                    newScriptFile="J_SiteSensor1_ALTUI.js", 
+            local rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin",
+                {
+                    newDeviceType=MYTYPE,
+                    newScriptFile="J_SiteSensor1_ALTUI.js",
                     newDeviceDrawFunc="SiteSensor_ALTUI.DeviceDraw"
                 }, k )
             D("init() ALTUI's RegisterPlugin action returned resultCode=%1, resultString=%2, job=%3, returnArguments=%4", rc,rs,jj,ra)
-            rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin", 
-                { 
-                    newDeviceType=PRTYPE, 
-                    newScriptFile="J_SiteSensorProbe1_ALTUI.js", 
+            rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin",
+                {
+                    newDeviceType=PRTYPE,
+                    newScriptFile="J_SiteSensorProbe1_ALTUI.js",
                     newDeviceDrawFunc="SiteSensorProbe_ALTUI.DeviceDraw",
                     newFavoriteFunc="SiteSensorProbe_ALTUI.Favorite"
                 }, k )
@@ -1326,15 +1356,17 @@ function pluginInit(dev)
     end
 
     -- See if we need any one-time inits
-    runOnce(dev)
-    
+    if not runOnce(dev) then 
+        return true, "Waiting for reload", _PLUGIN_NAME
+    end
+
     -- Other inits
     math.randomseed( os.time() )
 
     -- There is no master tick task for this plugin.
     runStamp = 1
     -- scheduleDelay( { id=tostring(dev), func=masterTick, owner=dev }, 5 )
-    
+
     -- Ready to go. Start our children.
     local count = 0
     local started = 0
@@ -1355,7 +1387,7 @@ function pluginInit(dev)
     else
         setMessage( string.format("Started %d/%d at %s", started, count, os.date("%x %X")), dev )
     end
-
+   
     luup.set_failure( false, dev )
     return true, "OK", _PLUGIN_NAME
 end

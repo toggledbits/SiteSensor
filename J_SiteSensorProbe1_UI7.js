@@ -1,10 +1,10 @@
-//# sourceURL=J_SiteSensor1_UI7.js
+//# sourceURL=J_SiteSensorProbe1_UI7.js
 var SiteSensor = (function(api) {
 
     // unique identifier for this plugin...
     var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
 
-    var serviceId = "urn:toggledbits-com:serviceId:SiteSensor1";
+    var serviceId = "urn:toggledbits-com:serviceId:SiteSensorProbe1";
 
     var myModule = {};
     
@@ -261,19 +261,19 @@ var SiteSensor = (function(api) {
         var devNum = api.getCpanelDeviceId();
 
         // Set up defaults and (re)actions
-        var st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "Failed");
+        var st = api.getDeviceStateVariable(devNum, serviceId, "Failed");
         jQuery("div#sitesensor-status img#status-indicator-caution").attr('src', st == "0" ? ipath("status-indicator-caution-off") : ipath("status-indicator-caution-on"));
         st = api.getDeviceStateVariable(devNum, "urn:micasaverde-com:serviceId:SecuritySensor1", "Armed");
         jQuery("div#sitesensor-status img#status-indicator-armed").attr('src', st == "0" ? ipath("status-indicator-armed-off") : ipath("status-indicator-armed-on"));
         st = api.getDeviceStateVariable(devNum, "urn:micasaverde-com:serviceId:SecuritySensor1", "Tripped");
         jQuery("div#sitesensor-status img#status-indicator-tripped").attr('src', st == "0" ? ipath("status-indicator-tripped-off") : ipath("status-indicator-tripped-on"));
 
-        st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "LogRequests");
+        st = api.getDeviceStateVariable(devNum, serviceId, "LogRequests") || "0";
         if ( st == "0" ) {
             jQuery("div#sitesensor-log").hide();
         } else {
             jQuery("div#sitesensor-log").show();
-            st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "LogCapture");
+            st = api.getDeviceStateVariable(devNum, serviceId, "LogCapture") || "";
             st = st.replace(/[|]/g, "\n");
             jQuery("div#sitesensor-log textarea").val(st);
         }
@@ -288,7 +288,7 @@ var SiteSensor = (function(api) {
 
             var devNum = api.getCpanelDeviceId();
             
-            var st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "HideStatusIndicator");
+            var st = api.getDeviceStateVariable(devNum, serviceId, "HideStatusIndicator");
             if ( st == "1" || st == "true" ) {
                 return;
             }

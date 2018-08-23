@@ -76,9 +76,9 @@
         </action>
         <action>
             <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
-            <name>AddSensor</name>
+            <name>AddProbe</name>
             <run>
-                SiteSensor.actionAddSensor( lul_device )
+                SiteSensor.actionAddProbe( lul_device )
             </run>
         </action>
         <action>
