@@ -1313,6 +1313,13 @@ function pluginInit(dev)
             isALTUI = true
             local rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin", 
                 { 
+                    newDeviceType=MYTYPE, 
+                    newScriptFile="J_SiteSensor1_ALTUI.js", 
+                    newDeviceDrawFunc="SiteSensor_ALTUI.DeviceDraw"
+                }, k )
+            D("init() ALTUI's RegisterPlugin action returned resultCode=%1, resultString=%2, job=%3, returnArguments=%4", rc,rs,jj,ra)
+            rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin", 
+                { 
                     newDeviceType=PRTYPE, 
                     newScriptFile="J_SiteSensorProbe1_ALTUI.js", 
                     newDeviceDrawFunc="SiteSensorProbe_ALTUI.DeviceDraw",
