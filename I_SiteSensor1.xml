@@ -10,51 +10,51 @@
         function startupSiteSensor(dev)
             luup.log("SiteSensor Plugin START-UP!")
             SiteSensor = require("L_SiteSensor1")
-            siteSensorRunQuery = SiteSensor.runQuery
+            siteSensorTick = SiteSensor.taskTick
             siteSensorRequestHandler = SiteSensor.requestHandler
             luup.register_handler("siteSensorRequestHandler", "SiteSensor")
-            return SiteSensor.init(dev)
+            return SiteSensor.pluginInit(dev)
         end
     </functions>
     <startup>startupSiteSensor</startup>
     <actionList>
         <action>
-            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensorProbe1</serviceId>
             <name>GetInterval</name>
             <run>
                 return -- what we do here doesn't matter, luup uses the relatedStateVariable directly
             </run>
         </action>
         <action>
-            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensorProbe1</serviceId>
             <name>SetInterval</name>
             <run>
                 local newInterval = lul_settings.newTargetValue
                 if newInterval ~= nil then newInterval = tonumber(newInterval, 10) end
                 if newInterval ~= nil and newInterval >= 60 then
-                    luup.variable_set("urn:toggledbits-com:serviceId:SiteSensor1", "Interval", newInterval, lul_device)
+                    luup.variable_set("urn:toggledbits-com:serviceId:SiteSensorProbe1", "Interval", newInterval, lul_device)
                     return true
                 end
                 return false
             </run>
         </action>
         <action>
-            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensorProbe1</serviceId>
             <name>GetRequestURL</name>
             <run>
                 return -- what we do here doesn't matter, luup uses the relatedStateVariable directly
             </run>
         </action>
         <action>
-            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensorProbe1</serviceId>
             <name>SetRequestURL</name>
             <run>
                 local newRequestURL = lul_settings.newTargetValue or ""
-                luup.variable_set("urn:toggledbits-com:serviceId:SiteSensor1", "RequestURL", newRequestURL, lul_device)
+                luup.variable_set("urn:toggledbits-com:serviceId:SiteSensorProbe1", "RequestURL", newRequestURL, lul_device)
             </run>
         </action>
         <action>
-            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensorProbe1</serviceId>
             <name>LogRequests</name>
             <run>
                 local enabled = ( tonumber( lul_settings.Enabled ) or 0 ) ~= 0
@@ -72,6 +72,13 @@
                     SiteSensor.disarm(lul_device)
                 end
                 return true
+            </run>
+        </action>
+        <action>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+            <name>AddSensor</name>
+            <run>
+                SiteSensor.actionAddSensor( lul_device )
             </run>
         </action>
         <action>

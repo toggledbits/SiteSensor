@@ -1,0 +1,136 @@
+<?xml version="1.0"?>
+<scpd xmlns="urn:schemas-upnp-org:service-1-0">
+    <specVersion>
+        <major>1</major>
+        <minor>0</minor>
+    </specVersion>
+    <serviceStateTable>
+        <stateVariable sendEvents="no">
+            <name>RequestURL</name>
+            <dataType>string</dataType>
+            <defaultValue></defaultValue>
+            <shortCode>url</shortCode>
+        </stateVariable>
+        <stateVariable sendEvents="no">
+            <name>Interval</name>
+            <dataType>ui4</dataType>
+            <defaultValue>1800</defaultValue>
+            <shortCode>interval</shortCode>
+        </stateVariable>
+        <stateVariable sendEvents="yes">
+            <name>LastMatchValue</name>
+            <dataType>string</dataType>
+            <defaultValue></defaultValue>
+            <shortCode>lastval</shortCode>
+        </stateVariable>
+        <stateVariable sendEvents="yes">
+            <name>Value1</name>
+            <dataType>string</dataType>
+            <defaultValue></defaultValue>
+            <shortCode>val1</shortCode>
+        </stateVariable>
+        <stateVariable sendEvents="yes">
+            <name>Value2</name>
+            <dataType>string</dataType>
+            <defaultValue></defaultValue>
+            <shortCode>val2</shortCode>
+        </stateVariable>
+        <stateVariable sendEvents="yes">
+            <name>Value3</name>
+            <dataType>string</dataType>
+            <defaultValue></defaultValue>
+            <shortCode>val3</shortCode>
+        </stateVariable>
+        <stateVariable sendEvents="yes">
+            <name>Value4</name>
+            <dataType>string</dataType>
+            <defaultValue></defaultValue>
+            <shortCode>val4</shortCode>
+        </stateVariable>
+        <stateVariable sendEvents="yes">
+            <name>Value5</name>
+            <dataType>string</dataType>
+            <defaultValue></defaultValue>
+            <shortCode>val5</shortCode>
+        </stateVariable>
+        <stateVariable sendEvents="yes">
+            <name>Value6</name>
+            <dataType>string</dataType>
+            <defaultValue></defaultValue>
+            <shortCode>val6</shortCode>
+        </stateVariable>
+        <stateVariable sendEvents="yes">
+            <name>Value7</name>
+            <dataType>string</dataType>
+            <defaultValue></defaultValue>
+            <shortCode>val7</shortCode>
+        </stateVariable>
+        <stateVariable sendEvents="yes">
+            <name>Value8</name>
+            <dataType>string</dataType>
+            <defaultValue></defaultValue>
+            <shortCode>val8</shortCode>
+        </stateVariable>
+    </serviceStateTable>
+    <actionList>
+        <action>
+            <name>SetInterval</name>
+            <argumentList>
+                <argument>
+                    <name>newIntervalValue</name>
+                    <relatedStateVariable>Interval</relatedStateVariable>
+                    <direction>in</direction>
+                </argument>
+            </argumentList>
+        </action>
+        <action>
+            <name>GetInterval</name>
+            <argumentList>
+                <argument>
+                    <name>ResultValue</name>
+                    <relatedStateVariable>Interval</relatedStateVariable>
+                    <direction>out</direction>
+                </argument>
+            </argumentList>
+        </action>
+        <action>
+            <name>SetRequestURL</name>
+            <argumentList>
+                <argument>
+                    <name>newRequestURL</name>
+                    <relatedStateVariable>RequestURL</relatedStateVariable>
+                    <direction>in</direction>
+                </argument>
+            </argumentList>
+        </action>
+        <action>
+            <name>GetRequestURL</name>
+            <argumentList>
+                <argument>
+                    <name>ResultValue</name>
+                    <relatedStateVariable>RequestURL</relatedStateVariable>
+                    <direction>out</direction>
+                </argument>
+            </argumentList>
+        </action>
+        <action>
+            <name>LogRequests</name>
+            <argumentList>
+                <argument>
+                    <name>Enabled</name>
+                    <relatedStateVariable>LogRequests</relatedStateVariable>
+                    <direction>in</direction>
+                </argument>
+            </argumentList>
+        </action>
+        <action>
+            <name>SetDebug</name>
+            <argumentList>
+                <argument>
+                    <name>debug</name>
+                    <direction>in</direction>
+                </argument>
+            </argumentList>
+        </action>
+    </actionList>
+</scpd>
