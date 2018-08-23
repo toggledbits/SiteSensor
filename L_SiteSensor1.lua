@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- L_SiteSensor.lua
+-- L_SiteSensor1.lua
 -- Copyright 2016, 2017 Patrick H. Rigney, All Rights Reserved
 -- This file is available under GPL 3.0. See LICENSE in documentation for info.
 --
@@ -771,25 +771,9 @@ local function runOnce(dev)
         -- Initialize for new installation
         D("runOnce() Performing first-time initialization!")
         luup.variable_set(MYSID, "Message", "", dev)
-        luup.variable_set(MYSID, "RequestURL", "", dev)
-        luup.variable_set(MYSID, "Interval", "1800", dev)
-        luup.variable_set(MYSID, "Timeout", "30", dev)
-        luup.variable_set(MYSID, "QueryArmed", "1", dev)
-        luup.variable_set(MYSID, "ResponseType", "text", dev)
-        luup.variable_set(MYSID, "Trigger", "err", dev)
-        luup.variable_set(MYSID, "Failed", "1", dev)
-        luup.variable_set(MYSID, "LastQuery", "0", dev)
-        luup.variable_set(MYSID, "LastRun", "0", dev)
-        luup.variable_set(MYSID, "LogRequests", "0", dev)
-        luup.variable_set(MYSID, "EvalInterval", "", dev)
-
-        luup.variable_set(SSSID, "Armed", "0", dev)
-        luup.variable_set(SSSID, "Tripped", "0", dev)
-        luup.variable_set(SSSID, "AutoUntrip", "0", dev)
-        
-        luup.variable_set(HASID, "ModeSetting", "1:;2:;3:;4:", dev )
-        
-        luup.attr_set( "category_num", 4, dev )
+        luup.variable_set(MYSID, "DebugMode", 0, dev)
+       
+        luup.attr_set( "category_num", 1, dev )
         luup.attr_set( "subcategory_num", "", dev )
         
         luup.variable_set(MYSID, "Version", _CONFIGVERSION, dev)
@@ -801,6 +785,8 @@ local function runOnce(dev)
         -- Conversion to 1.10. Find all SiteSensors incl this one and create a child
         -- of this one for it. Link it via the OldDevice state variable, which
         -- we'll detect separately.
+        luup.attr_set( "category_num", 1, dev ) -- Force category on new master
+        luup.attr_set( "subcategory_num", "", dev )
         local ptr = luup.chdev.start( dev )
         local count = 0
         for k,v in pairs(luup.devices) do
@@ -814,7 +800,7 @@ local function runOnce(dev)
                 end
                 D("plugin_runOnce() creating child for %1 (%2)", k, luup.devices[k].description)
                 luup.chdev.append( dev, ptr, "t"..k, v.description, PRTYPE,
-                    "D_SiteSensorProbe.xml", "",
+                    "D_SiteSensorProbe1.xml", "",
                     string.format("%s,%s=%d", PRSID, "OldDevice", k), false )
                 count = count + 1
             end
@@ -874,13 +860,12 @@ local function probeRunOnce( tdev )
             L("Probe %1 (%2) first run, copying from old instance %3...", tdev, luup.devices[tdev].description, old)
             local v = {'Message','RequestURL','Interval','Timeout','QueryArmed',
                 'QueryArmed','ResponseType','Trigger','Failed','LastQuery','LastRun',
-                'LogRequests','EvalInterval'}
+                'LogRequests','EvalInterval','LastResponse'}
             for _,varname in ipairs(v) do
                 luup.variable_set( PRSID, varname, luup.variable_get( MYSID, varname, old ) or "", tdev )
             end
             luup.attr_set( "room", luup.attr_get( "room", old ) or 0, tdev )
-            v = {'Armed','Tripped','AutoUntrip'}
-            for _,varname in ipairs(v) do
+            for _,varname in ipairs({'Armed','Tripped','AutoUntrip'}) do
                 luup.variable_set( SSSID, varname, luup.variable_get( SSSID, varname, old ) or "", tdev )
             end
             v = luup.variable_get( HASID, "ModeSetting", old )

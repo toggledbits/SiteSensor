@@ -4,7 +4,7 @@
  * Copyright 2018 Patrick H. Rigney, All Rights Reserved. 
  * AltUI special UI implementation for SiteSensor devices.
  */
-/* globals MultiBox,ALTUI_PluginDisplays,_T */
+/* globals MultiBox */
 
 "use strict";
 
