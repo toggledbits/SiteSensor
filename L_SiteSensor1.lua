@@ -1288,7 +1288,9 @@ function pluginInit(dev)
     L("starting plugin version %1 master device %2", _PLUGIN_VERSION, dev)
     
     if luup.variable_get( MYSID, "Converted", dev ) == "1" then
-        L("This instance %1 (%2) has been converted to a child device; This device should be deleted. See http://forum.micasaverde.com/index.php/topic,50440.0.html", dev, luup.devices[dev].description)
+        L("This instance %1 (%2) has been converted to a child device; This device should be deleted. See http://forum.micasaverde.com/index.php/topic,50440.0.html",
+            dev, luup.devices[dev].description)
+        luup.variable_set( MYSID, "Failed", 1, dev)
         setMessage( "Message", "Device upgraded/replaced. Delete this one!", dev )
         set_failure( true, dev )
         return false, "Upgraded/replaced", _PLUGIN_NAME
@@ -1311,10 +1313,10 @@ function pluginInit(dev)
             isALTUI = true
             local rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin", 
                 { 
-                    newDeviceType=MYTYPE, 
-                    newScriptFile="J_SiteSensor1_ALTUI.js", 
-                    newDeviceDrawFunc="SiteSensor_ALTUI.DeviceDraw",
-                    newFavoriteFunc="SiteSensor_ALTUI.Favorite"
+                    newDeviceType=PRTYPE, 
+                    newScriptFile="J_SiteSensorProbe1_ALTUI.js", 
+                    newDeviceDrawFunc="SiteSensorProbe_ALTUI.DeviceDraw",
+                    newFavoriteFunc="SiteSensorProbe_ALTUI.Favorite"
                 }, k )
             D("init() ALTUI's RegisterPlugin action returned resultCode=%1, resultString=%2, job=%3, returnArguments=%4", rc,rs,jj,ra)
         elseif v.device_type == "openLuup" then
