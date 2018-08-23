@@ -30,7 +30,7 @@ local tickTasks = {}
 
 local isALTUI = false
 local isOpenLuup = false
-local debugMode = false
+local debugMode = true
 
 local logCapture = {}
 local logMax = 50
@@ -250,14 +250,14 @@ function scheduleNext(dev, delay, taskinfo)
 
     -- Schedule next run. First, get and sanitize our interval if we weren't passed one.
     if delay == nil then
-        delay = getVarNumeric("Interval", 1800, dev)
+        delay = getVarNumeric("Interval", 1800, dev, PRSID)
         if isArmed(dev) then
-            delay = getVarNumeric("ArmedInterval", delay, dev)
+            delay = getVarNumeric("ArmedInterval", delay, dev, PRSID)
         end
         D("scheduleNext() interval is %1", delay)
         
         -- Now, see if we've missed an interval
-        local nextQuery = getVarNumeric("LastQuery", 0, dev) + delay
+        local nextQuery = getVarNumeric("LastQuery", 0, dev, PRSID) + delay
         local now = os.time()
         local nextDelay = nextQuery - now
         if nextDelay <= 0 then
@@ -274,7 +274,7 @@ function scheduleNext(dev, delay, taskinfo)
     -- See if we're doing eval ticks (rerunning evals between requests)
     local qtype = luup.variable_get(PRSID, "ResponseType", dev) or "text"
     if qtype == "json" then
-        local evalTick = getVarNumeric("EvalInterval", 0, dev)
+        local evalTick = getVarNumeric("EvalInterval", 0, dev, PRSID)
         if evalTick > 0 and evalTick < delay then
             D("scheduleNext() reducing delay from %1 to %2 for EvalInterval", delay, evalTick)
             delay = evalTick
@@ -355,11 +355,11 @@ end
 
 local function doRequest(url, method, body, dev)
     assert(dev ~= nil)
-    local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
+    local logRequest = (getVarNumeric("LogRequests", 0, dev, PRSID) ~= 0) or debugMode
     if method == nil then method = "GET" end
 
     -- A few other knobs we can turn
-    local timeout = getVarNumeric("Timeout", 30, dev) -- ???
+    local timeout = getVarNumeric("Timeout", 30, dev, PRSID) -- ???
     -- local maxlength = getVarNumeric("MaxLength", 262144, dev) -- ???
 
     local src
@@ -440,10 +440,10 @@ end
 local function doMatchQuery( dev )
     assert(dev ~= nil)
     local method = "GET"
-    local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
+    local logRequest = (getVarNumeric("LogRequests", 0, dev, PRSID) ~= 0) or debugMode
     local url = luup.variable_get(PRSID, "RequestURL", dev) or ""
     local pattern = luup.variable_get(PRSID, "Pattern", dev) or "^HTTP/1.. 200"
-    local timeout = getVarNumeric("Timeout", 30, dev)
+    local timeout = getVarNumeric("Timeout", 30, dev, PRSID)
     local trigger = luup.variable_get(PRSID, "Trigger", dev) or nil
 
     local buf = ""
@@ -579,7 +579,7 @@ local function doMatchQuery( dev )
 end
 
 local function doEval( dev, ctx )
-    local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
+    local logRequest = (getVarNumeric("LogRequests", 0, dev, PRSID) ~= 0) or debugMode
     local numErrors = 0
     
     -- Since we got a valid response, indicate not tripped, unless using TripExpression, then that.
@@ -706,7 +706,7 @@ end
 
 local function doJSONQuery(dev)
     assert(dev ~= nil)
-    local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
+    local logRequest = (getVarNumeric("LogRequests", 0, dev, PRSID) ~= 0) or debugMode
     local url = luup.variable_get(PRSID, "RequestURL", dev) or ""
     local ttype = luup.variable_get(PRSID, "Trigger", dev) or "err"
     
@@ -766,7 +766,7 @@ end
 
 local function runOnce(dev)
     assert(dev ~= nil)
-    local rev = getVarNumeric("Version", 0, dev)
+    local rev = getVarNumeric("Version", 0, dev, MYSID)
     if (rev == 0) then
         -- Initialize for new installation
         D("runOnce() Performing first-time initialization!")
@@ -791,6 +791,7 @@ local function runOnce(dev)
         local count = 0
         for k,v in pairs(luup.devices) do
             if v.device_type == MYTYPE then
+                D("plugin_runOnce() converting %1 (%2)", k, v.description)
                 luup.variable_set(MYSID, "Version", 11000, k) -- do now, so no repeat
                 if k ~= dev then
                     luup.variable_set(MYSID, "Converted", 1, k)
@@ -955,15 +956,15 @@ function runQuery(dev)
     local qtype = luup.variable_get(PRSID, "ResponseType", dev) or "text"
     local timeNow = os.time()
     luup.variable_set(PRSID, "LastRun", timeNow, dev)
-    local last = getVarNumeric( "LastQuery", 0, dev )
-    local interval = getVarNumeric( "Interval", 0, dev )
+    local last = getVarNumeric( "LastQuery", 0, dev, PRSID )
+    local interval = getVarNumeric( "Interval", 0, dev, PRSID )
     if isArmed then
-        interval = getVarNumeric( "ArmedInterval", interval, dev )
+        interval = getVarNumeric( "ArmedInterval", interval, dev, PRSID )
     end
     if timeNow >= ( last + interval ) then
 
         -- We may only query when armed, so check that.
-        local queryArmed = getVarNumeric("QueryArmed", 1, dev)
+        local queryArmed = getVarNumeric("QueryArmed", 1, dev, PRSID)
         if queryArmed == 0 or isArmed(dev) then
 
             -- Timestamp -- should we not do this if the query fails?
@@ -983,7 +984,7 @@ function runQuery(dev)
         end
     elseif qtype == "json" then
         -- Not time, but for JSON we may do an eval if re-eval ticks are enabled.
-        local evalTick = getVarNumeric( "EvalInterval", 0, dev )
+        local evalTick = getVarNumeric( "EvalInterval", 0, dev, PRSID )
         if evalTick > 0 then
             L("Performing re-evaluation of prior response")
             doEval( dev ) -- pass no context, doEval will reproduce it
