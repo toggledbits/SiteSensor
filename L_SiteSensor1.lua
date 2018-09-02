@@ -339,6 +339,7 @@ local function doRequest(url, method, body, dev)
     end
 
     -- Set up the request table
+    local r = {}
     local req = {
         url = url,
         source = src,
@@ -361,7 +362,6 @@ local function doRequest(url, method, body, dev)
 
     -- Make the request.
     local respBody, httpStatus
-    local r = {}
     http.TIMEOUT = timeout -- N.B. http not https, regardless
     if logRequest then
         L("%2 %1, headers=%3", url, method, tHeaders)
