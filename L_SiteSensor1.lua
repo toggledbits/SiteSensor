@@ -399,10 +399,23 @@ local function doRequest(url, method, body, dev)
         end
     end
 
+    -- Set up the request table
+    local req = {
+        url = url,
+        source = src,
+        sink = ltn12.sink.table(r),
+        method = method,
+        headers = tHeaders,
+        redirect = false
+    }
+    
     -- HTTP or HTTPS?
     local requestor
     if url:lower():find("https:") then
         requestor = https
+        req.verify = luup.variable_get( PRSID, "SSLVerify", dev ) or "none"
+        req.protocol = luup.variable_get( PRSID, "SSLProtocol", dev ) or 'tlsv1'
+        req.options = luup.variable_get( PRSID, "SSLOptions", dev ) or 'all'
     else
         requestor = http
     end
@@ -414,14 +427,7 @@ local function doRequest(url, method, body, dev)
     if logRequest then
         C(dev, "%2 %1, headers=%3", url, method, tHeaders)
     end
-    respBody, httpStatus = requestor.request{
-        url = url,
-        source = src,
-        sink = ltn12.sink.table(r),
-        method = method,
-        headers = tHeaders,
-        redirect = false
-    }
+    respBody, httpStatus = requestor.request(req)
     D("doRequest() request returned httpStatus=%1, respBody=%2", httpStatus, respBody)
 
     -- Since we're using the table sink, concatenate chunks to single string.
@@ -467,14 +473,6 @@ local function doMatchQuery( dev )
     -- Perform on-the-fly substitution of request values
     url = substitution( url, urlencode, dev )
 
-    -- HTTP or HTTPS?
-    local requestor
-    if url:lower():find("https:") then
-        requestor = https
-    else
-        requestor = http
-    end
-
     local tHeaders = {}
     local moreHeaders = luup.variable_get(PRSID, "Headers", dev) or ""
     if string.len(moreHeaders) > 0 then
@@ -487,15 +485,8 @@ local function doMatchQuery( dev )
         end
     end
 
-    D("doMatchQuery() seeking %1 in %2", pattern, url)
-
-    -- We don't use doRequest here because we can stop and close the
-    -- connection as soon as we find our pattern string.
-    http.TIMEOUT = timeout
-    if logRequest then
-        C(dev, "HTTP %2 %1, headers=%3", url, method, tHeaders)
-    end
-    cond, httpStatus, httpHeaders = requestor.request {
+    -- Set up the request table
+    local req =  {
         method = method,
         url = url,
         headers = tHeaders,
@@ -534,6 +525,28 @@ local function doMatchQuery( dev )
             end
         end
     }
+    
+    -- HTTP or HTTPS?
+    local requestor
+    if url:lower():find("https:") then
+        requestor = https
+        req.verify = luup.variable_get( PRSID, "SSLVerify", dev ) or "none"
+        req.protocol = luup.variable_get( PRSID, "SSLProtocol", dev ) or 'tlsv1'
+        req.options = luup.variable_get( PRSID, "SSLOptions", dev ) or 'all'
+    else
+        requestor = http
+    end
+
+    D("doMatchQuery() seeking %1 in %2", pattern, url)
+
+    -- We don't use doRequest here because we can stop and close the
+    -- connection as soon as we find our pattern string.
+    http.TIMEOUT = timeout
+    if logRequest then
+        C(dev, "HTTP %2 %1, headers=%3", url, method, tHeaders)
+    end
+    D("doMatchQuery() sending req=%1", req)
+    cond, httpStatus, httpHeaders = requestor.request(req)
     --[[ Notes
         Interesting semantics to the return values here. If the pattern is matched before the body response has been
         completely processed, our sink returns nil (because hey, work is done at that point), but it causes request()
