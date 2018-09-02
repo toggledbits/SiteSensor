@@ -464,7 +464,9 @@
             "Position": "1",
             "TabType": "javascript",
             "ScriptName": "J_SiteSensorProbe1_UI7.js",
-            "Function": "SiteSensor.configurePlugin"
+            "Function": "SiteSensor.configurePlugin",
+            "top_navigation_tab": 1,
+            "TopNavigationTab": 1
         },
         {
             "Label": {
