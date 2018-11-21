@@ -7,15 +7,14 @@
     <serviceStateTable>
         <stateVariable sendEvents="no">
             <name>DebugMode</name>
-            <dataType>ui4</dataType>
+            <dataType>boolean</dataType>
             <defaultValue>0</defaultValue>
         </stateVariable>
     </serviceStateTable>
     <actionList>
         <action>
             <name>AddProbe</name>
-            <argumentList>
-            </argumentList>
+            <argumentList></argumentList>
         </action>
         <action>
             <name>SetDebug</name>
@@ -23,6 +22,7 @@
                 <argument>
                     <name>debug</name>
                     <direction>in</direction>
+                    <relatedStateVariable>DebugMode</relatedStateVariable>
                 </argument>
             </argumentList>
         </action>

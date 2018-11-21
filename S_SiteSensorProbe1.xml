@@ -71,6 +71,11 @@
             <defaultValue></defaultValue>
             <shortCode>val8</shortCode>
         </stateVariable>
+        <stateVariable sendEvents="no">
+            <name>LogRequests</name>
+            <dataType>boolean</dataType>
+            <defaultValue>0</defaultValue>
+        </stateVariable>
     </serviceStateTable>
     <actionList>
         <action>
@@ -119,15 +124,6 @@
                 <argument>
                     <name>Enabled</name>
                     <relatedStateVariable>LogRequests</relatedStateVariable>
-                    <direction>in</direction>
-                </argument>
-            </argumentList>
-        </action>
-        <action>
-            <name>SetDebug</name>
-            <argumentList>
-                <argument>
-                    <name>debug</name>
                     <direction>in</direction>
                 </argument>
             </argumentList>
