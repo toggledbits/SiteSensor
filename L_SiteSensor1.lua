@@ -9,6 +9,8 @@
 --   XML?
 -- -----------------------------------------------------------------------------
 
+-- ??? using PRSID to store Expr1..8 and Value1..8 will break existing Lua, PLEG, etc. even more.
+
 module("L_SiteSensor1", package.seeall)
 
 local debugMode = false
@@ -671,13 +673,15 @@ local function doEval( dev, ctx )
         -- Add raw result to context (available to subsequent expressions)
         ctx.expr[i] = r -- raw, not canonical
 
-        -- Save to device state if changed.
-        local oldVal = luup.variable_get(PRSID, "Value" .. tostring(i), dev)
+        -- Save to device state if changed. Note that we save the vales in MYSID
+        -- (not PRSID). This is to maintain better compatibility with older devices.
+        -- ??? Can we figure out to use PRSID with new installs?
+        local oldVal = luup.variable_get(MYSID, "Value" .. tostring(i), dev)
         D("doEval() newval=(%1)%2 canonical %3, oldVal=%4", type(r), r, rv, oldVal)
         if rv ~= oldVal then
             -- Set new value only if changed
             D("doEval() Expr%1 value changed, was %2 now %3", i, oldVal, rv)
-            luup.variable_set(PRSID, "Value" .. tostring(i), rv, dev)
+            luup.variable_set(MYSID, "Value" .. tostring(i), rv, dev)
         end
     end
 
