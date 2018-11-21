@@ -29,7 +29,7 @@
             <serviceId>urn:toggledbits-com:serviceId:SiteSensorProbe1</serviceId>
             <name>SetInterval</name>
             <run>
-                local newInterval = lul_settings.newTargetValue
+                local newInterval = lul_settings.newIntervalValue
                 if newInterval ~= nil then newInterval = tonumber(newInterval, 10) end
                 if newInterval ~= nil and newInterval >= 60 then
                     luup.variable_set("urn:toggledbits-com:serviceId:SiteSensorProbe1", "Interval", newInterval, lul_device)
@@ -49,8 +49,12 @@
             <serviceId>urn:toggledbits-com:serviceId:SiteSensorProbe1</serviceId>
             <name>SetRequestURL</name>
             <run>
-                local newRequestURL = lul_settings.newTargetValue or ""
-                luup.variable_set("urn:toggledbits-com:serviceId:SiteSensorProbe1", "RequestURL", newRequestURL, lul_device)
+                local newRequestURL = lul_settings.newRequestURL or ""
+                if newRequestURL ~= "" then
+                    luup.variable_set("urn:toggledbits-com:serviceId:SiteSensorProbe1", "RequestURL", newRequestURL, lul_device)
+                    return true
+                end
+                return false
             </run>
         </action>
         <action>
