@@ -251,7 +251,6 @@ local function scheduleDelay( tinfo, delay, flags )
     return scheduleTick( tinfo, delay+os.time(), flags )
 end
 
-
 function scheduleNext(dev, delay, taskinfo)
     D("scheduleNext(%1,%2,%3)", dev, delay, taskinfo)
     assert(dev ~= nil)
@@ -993,6 +992,21 @@ local function probeRunOnce( tdev )
     end
 end
 
+function doQuery(dev)
+    D("doQuery(%1)", dev)
+
+    -- Timestamp -- should we not do this if the query fails?
+    luup.variable_set(PRSID, "LastQuery", timeNow, dev)
+
+    -- What type of query?
+    local qtype = luup.variable_get(PRSID, "ResponseType", dev) or "text"
+    if qtype == "json" then
+        doJSONQuery(dev)
+    else
+        doMatchQuery(dev)
+    end
+end
+
 -- runQuery is the call_delay callback. It takes one argument (exactly), which we
 -- format as "stamp:devno"
 function runQuery(dev)
@@ -1012,16 +1026,7 @@ function runQuery(dev)
         -- We may only query when armed, so check that.
         local queryArmed = getVarNumeric("QueryArmed", 1, dev, PRSID)
         if queryArmed == 0 or isArmed(dev) then
-
-            -- Timestamp -- should we not do this if the query fails?
-            luup.variable_set(PRSID, "LastQuery", timeNow, dev)
-
-            -- What type of query?
-            if qtype == "json" then
-                doJSONQuery(dev)
-            else
-                doMatchQuery(dev)
-            end
+            doQuery(dev)
         else
             -- Disarmed and querying only when armed. No reschedule.
             D("runQuery() disarmed, query disabled; not rescheduling.")
@@ -1077,6 +1082,11 @@ function requestLogging( dev, enabled )
         luup.variable_set( PRSID, "LogRequests", "0", dev )
         logCapture[tostring(dev)] = nil -- free up for gc
     end
+end
+
+function actionDoRequest( dev )
+    L("%1 (%2) request by action", luup.devices[dev].description, dev)
+    doQuery(dev)
 end
 
 function actionSetDebug( dev, state )

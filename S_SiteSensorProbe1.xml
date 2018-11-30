@@ -79,6 +79,11 @@
     </serviceStateTable>
     <actionList>
         <action>
+            <name>DoRequest</name>
+            <argumentList>
+            </argumentList>
+        </action>
+        <action>
             <name>SetInterval</name>
             <argumentList>
                 <argument>

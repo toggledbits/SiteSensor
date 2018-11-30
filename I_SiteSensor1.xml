@@ -2,11 +2,13 @@
 <implementation>
     <!-- files>L_LuaXP.lua</files -->
     <functions>
-        -- -------------------------------------------------------------------------------------------------------------------------
+        --[[
+        -----------------------------------------------------------------------
         -- SiteSensor
         -- https://github.com/toggledbits/SiteSensor
         -- Patrick Rigney, patrick@toggledbits.com
-        -- -------------------------------------------------------------------------------------------------------------------------
+        -- --------------------------------------------------------------------
+        --]]
         function startupSiteSensor(dev)
             luup.log("SiteSensor Plugin START-UP!")
             SiteSensor = require("L_SiteSensor1")
@@ -18,6 +20,14 @@
     </functions>
     <startup>startupSiteSensor</startup>
     <actionList>
+        <action>
+            <serviceId>urn:toggledbits-com:serviceId:SiteSensorProbe1</serviceId>
+            <name>DoRequest</name>
+            <job>
+                SiteSensor.actionDoRequest( lul_device )
+                return 4,0 
+            </job>
+        </action>
         <action>
             <serviceId>urn:toggledbits-com:serviceId:SiteSensorProbe1</serviceId>
             <name>GetInterval</name>
