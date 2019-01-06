@@ -2,6 +2,7 @@
 
 ## Version 1.10 (develop branch) ##
 
+* Upgrade detection of AltUI so we don't falsely detect when bridged (on "real" device triggers AltUI feature registration).
 * SiteSensor has been converted to the parent/child plugin model, which is vastly more resource efficient in the constrained Vera execution environment. Existing SiteSensor instances will be converted to child devices, and the plugin attempts to find scene trigger references to the old devices and remap them to the new child devices. However, sensor references in notifications, Lua or PLEG are not converted automatically, and so must be located and changed by hand. Sorry guys, but it's a one time change for a big benefit, and I deemed this a necessary evil, and it should only inconvenience a minority of users.
 * Add DoRequest action to probes (child devices) to force request and update.
 

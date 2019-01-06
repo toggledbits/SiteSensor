@@ -1351,7 +1351,7 @@ function pluginInit(dev)
 
     -- Check for ALTUI and OpenLuup
     for k,v in pairs(luup.devices) do
-        if v.device_type == "urn:schemas-upnp-org:device:altui:1" then
+        if v.device_type == "urn:schemas-upnp-org:device:altui:1" and v.device_num_parent == 0 then
             D("init() detected ALTUI at %1", k)
             isALTUI = true
             local rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin",
