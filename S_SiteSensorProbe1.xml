@@ -97,9 +97,10 @@
             <name>GetInterval</name>
             <argumentList>
                 <argument>
-                    <name>ResultValue</name>
+                    <name>Interval</name>
                     <relatedStateVariable>Interval</relatedStateVariable>
                     <direction>out</direction>
+                    <retval/>
                 </argument>
             </argumentList>
         </action>
@@ -117,9 +118,10 @@
             <name>GetRequestURL</name>
             <argumentList>
                 <argument>
-                    <name>ResultValue</name>
+                    <name>RequestURL</name>
                     <relatedStateVariable>RequestURL</relatedStateVariable>
                     <direction>out</direction>
+                    <retval/>
                 </argument>
             </argumentList>
         </action>
