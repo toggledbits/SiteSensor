@@ -1,5 +1,12 @@
 # CHANGELOG #
 
+## Version 1.10 (development)
+
+* Support virtual sensors as target value containers for expression results.
+* Add SSL control state variables SSLVerify, SSLProtocol, and SSLOptions, which pass their values through to the underlying implementation. The most common use is likely to be setting SSLVerify=none, allowing connection to SSL endpoints with self-signed certification (i.e. certificates that can't verified; the default is "peer").
+* Improved error feedback to user on match queries, particularly when connection errors occur.
+* Implement DoRequest action to force immediate request and update.
+
 ## Version 1.9 (released) ##
 
 * Make category and subcategory assignment more definitive.
