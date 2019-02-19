@@ -40,6 +40,7 @@ local luaxp = require("L_LuaXP")
 
 local dfMap = {
     ["urn:schemas-micasaverde-com:device:MotionSensor:1"] = { 
+        name="Security Sensor",
         device_file="D_MotionSensor1.xml", 
         service="urn:micasaverde-com:serviceId:SecuritySensor1", 
         variable="Tripped", 
@@ -48,6 +49,7 @@ local dfMap = {
         subcategory=0
     },
     ["urn:schemas-micasaverde-com:device:TemperatureSensor:1"] = { 
+        name="Temperature Sensor",
         device_file="D_TemperatureSensor1.xml", 
         service="urn:upnp-org:serviceId:TemperatureSensor1", 
         variable="CurrentTemperature", 
@@ -56,6 +58,7 @@ local dfMap = {
         subcategory=0
     },
     ["urn:schemas-micasaverde-com:device:HumiditySensor:1"] = { 
+        name="Humidity Sensor",
         device_file="D_HumiditySensor1.xml", 
         service="urn:micasaverde-com:serviceId:HumiditySensor1", 
         variable="CurrentLevel", 
@@ -64,6 +67,7 @@ local dfMap = {
         subcategory=0
     },
     ["urn:schemas-micasaverde-com:device:LightSensor:1"] = { 
+        name="Light Sensor",
         device_file="D_LightSensor1.xml", 
         service="urn:micasaverde-com:serviceId:LightSensor1", 
         variable="CurrentLevel", 
@@ -72,6 +76,7 @@ local dfMap = {
         subcategory=0
     },
     ["urn:schemas-micasaverde-com:device:GenericSensor:1"] = { 
+        name="Generic Sensor",
         device_file="D_GenericSensor1.xml", 
         service="urn:micasaverde-com:serviceId:GenericSensor1", 
         variable="CurrentLevel", 
@@ -80,6 +85,7 @@ local dfMap = {
         subcategory=0
     },
     ["urn:schemas-upnp-org:device:BinaryLight:1"] = { 
+        name="Virtual Switch",
         device_file="D_BinaryLight1.xml", 
         service="urn:upnp-org:serviceId:SwitchPower1", 
         variable="Status", 
@@ -673,18 +679,20 @@ local function doEval( dev, ctx )
             if dv and luup.devices[dv] then
                 local df = dfMap[ luup.devices[dv].device_type ]
                 if df then
-                    -- Note: re-using rv
+                    -- Note: re-using rv -- convert to sensor form value
                     if df.datatype == "boolean" then
-                        if type(r) == "boolean" then rv = r and 1 or 0
-                        elseif type(r) == "number" then rv = (r==0) and 0 or 1
+                        if type(r) == "boolean" then rv = r and "1" or "0"
+                        elseif type(r) == "number" then rv = (r~=0) and "1" or "0"
                         elseif type(r) == "string" then
-                            rv = #r > 0 and r ~= "false" and r ~= "0"
+                            rv = ( #r > 0 and r ~= "false" and r ~= "0" ) and "1" or "0"
                         else
                             rv = r ~= nil
                         end
+                        D("doEval() converting %1(%2) to sensor boolean value %3", r, type(r), rv)
                     else
                         rv = tostring(r)
                     end
+                    D("doEval() converted %1(%2) to sensor %4 value %3", r, type(r), rv, df.datatype)
                     D("doEval() setting child %1 (#%2) %3/%4=%5", i, dv, df.service, df.variable, rv)
                     luup.variable_set( df.service or MYSID, df.variable or "CurrentLevel", rv, dv )
                 else
@@ -1128,6 +1136,13 @@ function init(dev)
     end
     luup.chdev.sync( dev, ptr )
     
+    -- If JSON-type query, re-eval last response right now to make sure sensors
+    -- are updated.
+    local qtype = luup.variable_get(MYSID, "ResponseType", dev) or "text"
+    if qtype == "json" then
+        doEval( dev, nil ) -- no context, will fetch last stored.
+    end
+    
     -- Schedule next query.
     runStamp = 1
     scheduleNext(dev, nil, runStamp)
@@ -1225,6 +1240,27 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
             end
         end
         return json.encode( st ), "application/json"
+        
+    elseif action == "getvtypes" then
+        local r = {}
+        if isOpenLuup then
+            -- For openLuup, only show device types for resources that are installed
+            local olv = getVarNumeric( "Vnumber", 0, isOpenLuup, "openLuup" )
+            local loader = require "openLuup.loader"
+            if loader.find_file ~= nil then
+                for k,v in pairs( dfMap ) do
+                    if loader.find_file( v.device_file ) then 
+                        r[k] = v
+                    end
+                end
+            else
+                L{level=1,msg="PLEASE UPGRADE YOUR OPENLUUP TO 181122 OR HIGHER FOR FULL SUPPORT OF SITESENSOR VIRTUAL DEVICES"}
+            end
+        else
+            r = dfMap
+        end
+        return json.encode( r ), "application/json"
+                
     end
     
     return "<html><head><title>" .. _PLUGIN_NAME .. " Request Handler"
