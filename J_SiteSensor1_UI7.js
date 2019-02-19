@@ -20,7 +20,9 @@ var SiteSensor = (function(api, $) {
     var myModule = {};
 
     var isVisible = false;
-
+    var isOpenLuup = false;
+    // var isALTUI = false;
+    
     function updateResponseFields() {
         var rtype = jQuery('select#rtype').val();
         jQuery('select#trigger option[value="match"]').attr('disabled', rtype != "text");
@@ -47,6 +49,13 @@ var SiteSensor = (function(api, $) {
     }
     
     function initPlugin() {
+        var ud = api.getUserData();
+        for (var i=0; i < ud.devices.length; ++i ) {
+            if ( ud.devices[i].device_type == "openLuup" && ud.devices[i].id_parent == 0 ) {
+                isOpenLuup = true;
+                break;
+            }
+        }
     }
 
     function configurePlugin()
@@ -127,11 +136,17 @@ var SiteSensor = (function(api, $) {
                 numexp = 8;
             }
             html += "<h2>Value Expressions</h2>";
-            html += "<p>Use these expressions to draw values from the response JSON data and store them in state variables. You can use these values as triggers for scenes and Lua scripts. You can also push the expression values out to virtual sensors (created children of this SiteSensor) for use with scene triggers, Reactor, etc.</p>";
+            html += "<p>Use these expressions to draw values from the response JSON data and store them in state variables. You can use these values as triggers for scenes and Lua scripts.";
+            if ( !isOpenLuup ) {
+                html += " You can also push the expression values out to virtual sensors (created children of this SiteSensor) for use with scene triggers, Reactor, etc.";
+            }
+            html += "</p>";
             html += "<ol>";
             for (var ix=1; ix<=numexp; ix += 1) {
                 html += '<li><input class="jsonexpr" id="expr' + ix + '" size="64" type="text">';
-                html += ' Child sensor: <select class="childtype" id="child' + ix + '"><option value="">(none)</option></select>';
+                if ( !isOpenLuup ) {
+                    html += ' Child sensor: <select class="childtype" id="child' + ix + '"><option value="">(none)</option></select>';
+                }
                 html += '</li>';
             }
             html += "</ol>";
@@ -246,24 +261,26 @@ var SiteSensor = (function(api, $) {
                 api.setDeviceStatePersistent(myDevice, serviceId, "EvalInterval", newVal, 0);
             });
 
-            var childMenu = jQuery( '<select/>' );
-            var childtypes = [
-                { "name": "Security Sensor (boolean)", "type": "urn:schemas-micasaverde-com:device:MotionSensor:1" },
-                { "name": "Temperature Sensor (numeric)", "type": "urn:schemas-micasaverde-com:device:TemperatureSensor:1" },
-                { "name": "Humidity Sensor (numeric)", "type": "urn:schemas-micasaverde-com:device:HumiditySensor:1" },
-                { "name": "Light Sensor (numeric)", "type": "urn:schemas-micasaverde-com:device:LightSensor:1" },
-                { "name": "Generic Sensor (numeric)", "type": "urn:schemas-micasaverde-com:device:GenericSensor:1" },
-                { "name": "Virtual Switch (boolean)", "type": "urn:schemas-upnp-org:device:BinaryLight:1" },
-            ];
-            for ( ix=0; ix<childtypes.length; ix++ ) {
-                childMenu.append( jQuery( '<option/>' ).val( childtypes[ix].type ).text( childtypes[ix].name ) );
+            if ( !isOpenLuup ) {
+                var childMenu = jQuery( '<select/>' );
+                var childtypes = [
+                    { "name": "Security Sensor (boolean)", "type": "urn:schemas-micasaverde-com:device:MotionSensor:1" },
+                    { "name": "Temperature Sensor (numeric)", "type": "urn:schemas-micasaverde-com:device:TemperatureSensor:1" },
+                    { "name": "Humidity Sensor (numeric)", "type": "urn:schemas-micasaverde-com:device:HumiditySensor:1" },
+                    { "name": "Light Sensor (numeric)", "type": "urn:schemas-micasaverde-com:device:LightSensor:1" },
+                    { "name": "Generic Sensor (numeric)", "type": "urn:schemas-micasaverde-com:device:GenericSensor:1" },
+                    { "name": "Virtual Switch (boolean)", "type": "urn:schemas-upnp-org:device:BinaryLight:1" },
+                ];
+                for ( ix=0; ix<childtypes.length; ix++ ) {
+                    childMenu.append( jQuery( '<option/>' ).val( childtypes[ix].type ).text( childtypes[ix].name ) );
+                }
+                childMenu = childMenu.children();
+                jQuery( 'select.childtype' ).append( childMenu ).on( 'change.sitesensor', function( ev ) {
+                    var el = jQuery( ev.currentTarget );
+                    var id = el.attr( 'id' ).substr( 5 );
+                    api.setDeviceStatePersistent( api.getCpanelDeviceId(), serviceId, "Child" + id, el.val() || "" );
+                });
             }
-            childMenu = childMenu.children();
-            jQuery( 'select.childtype' ).append( childMenu ).on( 'change.sitesensor', function( ev ) {
-                var el = jQuery( ev.currentTarget );
-                var id = el.attr( 'id' ).substr( 5 );
-                api.setDeviceStatePersistent( api.getCpanelDeviceId(), serviceId, "Child" + id, el.val() || "" );
-            });
 
             jQuery( 'input.jsonexpr' ).each( function( obj ) {
                 var ix = jQuery( this ).attr('id').substr(4);
