@@ -71,6 +71,10 @@
             <defaultValue></defaultValue>
             <shortCode>val8</shortCode>
         </stateVariable>
+        <stateVariable sendEvents="no">
+            <name>A_ARG_TYPE_boolean</name>
+            <dataType>boolean</dataType>
+        </stateVariable>
     </serviceStateTable>
     <actionList>
         <action>
@@ -90,6 +94,7 @@
                     <name>ResultValue</name>
                     <relatedStateVariable>Interval</relatedStateVariable>
                     <direction>out</direction>
+                    <retval/>
                 </argument>
             </argumentList>
         </action>
@@ -110,6 +115,7 @@
                     <name>ResultValue</name>
                     <relatedStateVariable>RequestURL</relatedStateVariable>
                     <direction>out</direction>
+                    <retval/>
                 </argument>
             </argumentList>
         </action>
@@ -118,10 +124,14 @@
             <argumentList>
                 <argument>
                     <name>Enabled</name>
-                    <relatedStateVariable>LogRequests</relatedStateVariable>
+                    <relatedStateVariable>A_ARG_TYPE_boolean</relatedStateVariable>
                     <direction>in</direction>
                 </argument>
             </argumentList>
+        </action>
+        <action>
+            <name>DoRequest</name>
+            <argumentList/>
         </action>
         <action>
             <name>SetDebug</name>
