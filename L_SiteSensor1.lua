@@ -15,7 +15,7 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.10develop-19048"
+local _PLUGIN_VERSION = "1.10"
 local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 11000
 
@@ -25,7 +25,7 @@ local SSSID = "urn:micasaverde-com:serviceId:SecuritySensor1"
 local HASID = "urn:micasaverde-com:serviceId:HaDevice1"
 
 local pluginDevice
-local runstamp = 0
+local runStamp = 0
 local isALTUI = false
 local isOpenLuup = false
 local myChildren
@@ -1245,7 +1245,6 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
         local r = {}
         if isOpenLuup then
             -- For openLuup, only show device types for resources that are installed
-            local olv = getVarNumeric( "Vnumber", 0, isOpenLuup, "openLuup" )
             local loader = require "openLuup.loader"
             if loader.find_file ~= nil then
                 for k,v in pairs( dfMap ) do

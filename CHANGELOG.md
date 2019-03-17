@@ -1,6 +1,6 @@
 # CHANGELOG #
 
-## Version 1.10 (development)
+## Version 1.10 (released)
 
 * Support for more than 8 (default) expressions in JSON requests. This is currently done by setting the NumExp state variable.
 * Support virtual sensors as target value containers for expression results on Vera Luup. This feature is not available on openLuup.
