@@ -1,6 +1,6 @@
 -- -----------------------------------------------------------------------------
 -- L_SiteSensor.lua
--- Copyright 2016, 2017 Patrick H. Rigney, All Rights Reserved
+-- Copyright 2016,2017,2019 Patrick H. Rigney, All Rights Reserved
 -- This file is available under GPL 3.0. See LICENSE in documentation for info.
 --
 -- TO-DO:
@@ -11,31 +11,89 @@
 
 module("L_SiteSensor1", package.seeall)
 
-local _PLUGIN_ID = 8942
+local debugMode = false
+
+local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.9+SSLOPT"
+local _PLUGIN_VERSION = "1.10"
 local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
-local _CONFIGVERSION = 10900
+local _CONFIGVERSION = 11000
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local MYTYPE = "urn:schemas-toggledbits-com:device:SiteSensor:1"
 local SSSID = "urn:micasaverde-com:serviceId:SecuritySensor1"
 local HASID = "urn:micasaverde-com:serviceId:HaDevice1"
 
-local idata = {} -- per-instance data
-
+local pluginDevice
+local runStamp = 0
 local isALTUI = false
 local isOpenLuup = false
-local debugMode = false
-
+local myChildren
 local logCapture = {}
 local logMax = 50
 
 local https = require("ssl.https")
 local http = require("socket.http")
 local ltn12 = require("ltn12")
-local dkjson = require('dkjson')
+local json = require('dkjson')
 local luaxp = require("L_LuaXP")
+
+local dfMap = {
+    ["urn:schemas-micasaverde-com:device:MotionSensor:1"] = { 
+        name="Security Sensor",
+        device_file="D_MotionSensor1.xml", 
+        service="urn:micasaverde-com:serviceId:SecuritySensor1", 
+        variable="Tripped", 
+        datatype="boolean",
+        category=4,
+        subcategory=0
+    },
+    ["urn:schemas-micasaverde-com:device:TemperatureSensor:1"] = { 
+        name="Temperature Sensor",
+        device_file="D_TemperatureSensor1.xml", 
+        service="urn:upnp-org:serviceId:TemperatureSensor1", 
+        variable="CurrentTemperature", 
+        datatype="number",
+        category=17,
+        subcategory=0
+    },
+    ["urn:schemas-micasaverde-com:device:HumiditySensor:1"] = { 
+        name="Humidity Sensor",
+        device_file="D_HumiditySensor1.xml", 
+        service="urn:micasaverde-com:serviceId:HumiditySensor1", 
+        variable="CurrentLevel", 
+        datatype="number",
+        category=16,
+        subcategory=0
+    },
+    ["urn:schemas-micasaverde-com:device:LightSensor:1"] = { 
+        name="Light Sensor",
+        device_file="D_LightSensor1.xml", 
+        service="urn:micasaverde-com:serviceId:LightSensor1", 
+        variable="CurrentLevel", 
+        datatype="number",
+        category=18,
+        subcategory=0
+    },
+    ["urn:schemas-micasaverde-com:device:GenericSensor:1"] = { 
+        name="Generic Sensor",
+        device_file="D_GenericSensor1.xml", 
+        service="urn:micasaverde-com:serviceId:GenericSensor1", 
+        variable="CurrentLevel", 
+        datatype="number",
+        category=12,
+        subcategory=0
+    },
+    ["urn:schemas-upnp-org:device:BinaryLight:1"] = { 
+        name="Virtual Switch",
+        device_file="D_BinaryLight1.xml", 
+        service="urn:upnp-org:serviceId:SwitchPower1", 
+        variable="Status", 
+        datatype="boolean",
+        category=3,
+        subcategory=0
+    }
+}
 
 local function dump(t)
     if t == nil then return "nil" end
@@ -45,8 +103,6 @@ local function dump(t)
         local val
         if type(v) == "table" then
             val = dump(v)
-        elseif type(v) == "function" then
-            val = "(function)"
         elseif type(v) == "string" then
             val = string.format("%q", v)
         else
@@ -59,7 +115,7 @@ local function dump(t)
     return str
 end
 
-local function L(msg, ...)
+local function L(msg, ...) -- luacheck: ignore 212
     local str
     local level = 50
     if type(msg) == "table" then
@@ -76,22 +132,29 @@ local function L(msg, ...)
                 return dump(val)
             elseif type(val) == "string" then
                 return string.format("%q", val)
+            elseif type(val) == "number" and math.abs(val-os.time()) <= 86400 then
+                return tostring(val) .. "(" .. os.date("%x.%X", val) .. ")"
             end
             return tostring(val)
         end
     )
     luup.log(str, level)
-    if type(msg) == "string" then -- don't capture debug
-        table.insert( logCapture, os.date("%X") .. ": " .. str )
-        if #logCapture > logMax then table.remove( logCapture, 1 ) end
-        luup.variable_set( MYSID, "LogCapture", table.concat( logCapture, "|" ), luup.device )
-    end
+    return str
 end
 
 local function D(msg, ...)
     if debugMode then
-        L( { msg=msg,prefix=_PLUGIN_NAME .. "(debug)::" }, ... )
+        L( { msg=msg,prefix=(_PLUGIN_NAME .. "(debug)") }, ... )
     end
+end
+
+-- Capture log
+local function C(dev, msg, ...)
+    assert(type(dev)=="number")
+    local str = L(msg,...)
+    table.insert( logCapture, os.date("%X") .. ": " .. str )
+    if #logCapture > logMax then table.remove( logCapture, 1 ) end
+    luup.variable_set( MYSID, "LogCapture", table.concat( logCapture, "|" ), dev )
 end
 
 local function split( str, sep )
@@ -103,76 +166,74 @@ local function split( str, sep )
     return arr, #arr
 end
 
-local function parseRefExpr(ex, ctx)
+local function findChild( id )
+    if myChildren == nil then
+        myChildren = {}
+        for k,v in pairs( luup.devices ) do
+            if v.device_num_parent == pluginDevice then
+                myChildren[ v.id ] = k
+            end
+        end
+    end
+    return myChildren[ id ] or false -- force return boolean instead of nil
+end
+
+local function parseRefExpr(ex, ctx, dev)
     D("parseRefExpr(%1,ctx)", ex, ctx)
-    local cx, err
-    cx, err = luaxp.compile(ex,ctx)
+    local cx, err = luaxp.compile(ex,ctx)
     if cx == nil then
-        L("Failed to parse expression `%1', %2", ex, err)
+        C(dev, "Failed to parse expression `%1', %2", ex, err)
         return nil
     end
 
     local val
     val, err = luaxp.run(cx, ctx)
     if val == nil then
-        L("Failed to execute `%1', %2", ex, err)
+        C(dev, "Failed to execute `%1', %2", ex, err)
     end
     return val
+end
+
+local function getVar( name, dflt, dev, serviceId )
+    local s = luup.variable_get(serviceId or MYSID, name, dev or pluginDevice) or ""
+    return ( not string.match( s, "^%s*$" ) ) and s or dflt -- this specific test allows nil dflt return
 end
 
 -- Get numeric variable, or return default value if not set or blank
 local function getVarNumeric( name, dflt, dev, serviceId )
     assert( dev ~= nil )
-    if serviceId == nil then serviceId = MYSID end
-    local s = luup.variable_get(serviceId, name, dev)
-    if (s == nil or s == "") then return dflt end
-    s = tonumber(s, 10)
-    if (s == nil) then return dflt end
-    return s
+    local s = luup.variable_get(serviceId or MYSID, name, dev or pluginDevice) or ""
+    if s == "" then return dflt end
+    return tonumber(s) or dflt
 end
 
 local function setMessage(s, dev)
-    assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
-    luup.variable_set(MYSID, "Message", s or "", dev)
+    luup.variable_set(MYSID, "Message", s or "", dev or pluginDevice)
 end
 
 local function isFailed(dev)
-    assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
-    local failed = getVarNumeric("Failed", 0, dev, MYSID)
-    return failed ~= 0
+    return getVarNumeric("Failed", 0, dev or pluginDevice, MYSID) ~= 0
 end
 
 local function fail(failState, dev)
-    assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
     assert(type(failState) == "boolean")
     D("fail(%1,%2)", failState, dev)
     if failState ~= isFailed(dev) then
-        local fval = 0
-        if failState then fval = 1 end
-        luup.variable_set(MYSID, "Failed", fval, dev)
+        local fval = failState and 1 or 0
+        luup.variable_set(MYSID, "Failed", fval, dev or pluginDevice)
     end
+    luup.set_failure( failState and 1 or 0, dev or pluginDevice )
 end
 
 local function isArmed(dev)
-    assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
-    local armed = getVarNumeric("Armed", 0, dev, SSSID)
-    return armed ~= 0
+    return getVarNumeric("Armed", 0, dev, SSSID) ~= 0
 end
 
 local function isTripped(dev)
-    assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
-    local tripped = getVarNumeric("Tripped", 0, dev, SSSID)
-    return tripped ~= 0
+    return getVarNumeric("Tripped", 0, dev, SSSID) ~= 0
 end
 
 local function trip(tripped, dev)
-    assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
     assert(type(tripped) == "boolean")
     D("trip(%1,%2)", tripped, dev)
     local newVal
@@ -192,15 +253,17 @@ end
 function scheduleNext(dev, delay, stamp)
     D("scheduleNext(%1,%2,%3)", dev, delay, stamp)
     assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
 
     -- Schedule next run. First, get and sanitize our interval if we weren't passed one.
     if delay == nil then
-        delay = getVarNumeric("Interval", 1800, dev)
-        if isArmed(dev) then
-            delay = getVarNumeric("ArmedInterval", delay, dev)
+        delay = getVarNumeric( "Interval", 1800, dev )
+        if isArmed( dev ) then
+            delay = getVarNumeric( "ArmedInterval", delay, dev )
         end
         D("scheduleNext() interval is %1", delay)
+        if delay < 30 then
+            L({level=2,msg="WARNING! Request interval of %1 may be shorter than connection timeout, and cause all kinds of problems."}, delay)
+        end
         
         -- Now, see if we've missed an interval
         local nextQuery = getVarNumeric("LastQuery", 0, dev) + delay
@@ -238,11 +301,6 @@ local function b64encode( d )
     return mime.b64(d)
 end
 
-local function b64decode( d )
-    local mime = require("mime")
-    return mime.unb64(d)
-end
-
 local function urlencode( str )
     if str == nil then return "" end
     str = tostring(str)
@@ -251,9 +309,7 @@ end
 
 local function urldecode( str )
     if str == nil then return "" end
-    str = tostring(str)
-    str = str:gsub("%+", " ")
-    return str:gsub("%%(..)", function( c ) return string.char(tonumber(c,16)) end)
+    return tostring(str):gsub("%+", " "):gsub("%%(..)", function( c ) return string.char(tonumber(c,16)) end)
 end   
 
 -- Return the current timezone offset adjusted for DST
@@ -266,19 +322,19 @@ end
 
 local function substitution( str, enc, dev )
     local subMap = {
-          isodatetime = function( e ) return os.date("%Y-%m-%dT%H:%M:%S") end
-        , isodate = function( e ) return os.date("%Y-%m-%d") end
-        , isotime = function( e ) return os.date("%H:%M:%S") end
+          isodatetime = function( _ ) return os.date("%Y-%m-%dT%H:%M:%S") end
+        , isodate = function( _ ) return os.date("%Y-%m-%d") end
+        , isotime = function( _ ) return os.date("%H:%M:%S") end
           -- tzoffset returns timezone offset in ISO 8601-like format, -0500
-        , tzoffset = function( e, d ) local offs = tzoffs() / 60 local mag = math.abs(offs) local sg = offs < 0 local c = '+' if sg then c = '-' end return string.format("%s%02d%02d", c, mag / 60, mag % 60) end 
+        , tzoffset = function( _ ) local offs = tzoffs() / 60 local mag = math.abs(offs) local sg = offs < 0 local c = '+' if sg then c = '-' end return string.format("%s%02d%02d", c, mag / 60, mag % 60) end 
           -- tzdelta returns timezone offset formatted like -5hours (PHP-compatible date offset)
-        , tzrel = function( e, d ) local offs = tzoffs / 60 return string.format("%+dhours", offs / 60) end
-        , device = function( e, d ) return d end
-        , latitude = function( e ) return luup.latitude end
-        , longitude = function( e ) return luup.longitude end
-        , city = function( e ) return luup.city end
-        , basicauth = function( e, d ) return b64encode( (luup.variable_get( MYSID, "AuthUsername", d) or "") .. ":" .. (luup.variable_get( MYSID, "AuthPassword", d) or "") ) end
-        , ['random'] = function( e ) return math.random() end
+        , tzrel = function( _ ) local offs = tzoffs() / 60 return string.format("%+dhours", offs / 60) end
+        , device = function( d ) return d end
+        , latitude = function( _ ) return luup.latitude end
+        , longitude = function( _ ) return luup.longitude end
+        , city = function() return luup.city end
+        , basicauth = function( d ) return b64encode( (luup.variable_get( MYSID, "AuthUsername", d) or "") .. ":" .. (luup.variable_get( MYSID, "AuthPassword", d) or "") ) end
+        , ['random'] = function( _ ) return math.random() end
     }
     if str == nil then return nil end
     str = tostring(str)
@@ -289,7 +345,7 @@ local function substitution( str, enc, dev )
             if subMap[f] == nil then
                 s = "?" .. f .. "?"
             elseif type(subMap[f]) == "function" then
-                s = subMap[e]( e, dev )
+                s = subMap[e]( dev )
             else
                 s = subMap[e] or subMap[f] -- more to less specific
             end
@@ -301,7 +357,6 @@ end
 
 local function doRequest(url, method, body, dev)
     assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
     local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
     if method == nil then method = "GET" end
 
@@ -317,8 +372,10 @@ local function doRequest(url, method, body, dev)
 
     -- Build post/put data
     if type(body) == "table" then
-        body = dkjson.encode(body)
+        body = json.encode(body)
         tHeaders["Content-Type"] = "application/json"
+    elseif ( body or "" ) ~= "" then
+        tHeaders["Content-Type"] =  "application/x-www-form-urlencoded"
     end
     if body ~= nil then
         tHeaders["Content-Length"] = string.len(body)
@@ -353,9 +410,12 @@ local function doRequest(url, method, body, dev)
     local requestor
     if url:lower():find("https:") then
         requestor = https
-        req.verify = luup.variable_get( PRSID, "SSLVerify", dev ) or "none"
-        req.protocol = luup.variable_get( PRSID, "SSLProtocol", dev ) or 'tlsv1'
-        req.options = luup.variable_get( PRSID, "SSLOptions", dev ) or 'all'
+        req.verify = getVar( "SSLVerify", "none", dev, MYSID )
+        req.protocol = getVar( "SSLProtocol", nil, dev, MYSID )
+        req.options = getVar( "SSLOptions", nil, dev, MYSID )
+        req.cafile = getVar( "CAFile", nil, dev, MYSID )
+        C(dev, "Set up for HTTPS request, verify=%1, protocol=%2, options=%3", 
+            req.verify, req.protocol, req.options)
     else
         requestor = http
     end
@@ -364,13 +424,14 @@ local function doRequest(url, method, body, dev)
     local respBody, httpStatus
     http.TIMEOUT = timeout -- N.B. http not https, regardless
     if logRequest then
-        L("%2 %1, headers=%3", url, method, tHeaders)
+        C(dev, "%2 %1, headers=%3", url, method, tHeaders)
     end
     respBody, httpStatus = requestor.request(req)
     D("doRequest() request returned httpStatus=%1, respBody=%2", httpStatus, respBody)
 
     -- Since we're using the table sink, concatenate chunks to single string.
     respBody = table.concat(r)
+    r = nil -- luacheck: ignore 311 
 
     if logRequest then
         L("Response HTTP status %1, body=" .. respBody, httpStatus) -- use concat to avoid quoting
@@ -392,19 +453,13 @@ end
 
 local function doMatchQuery( dev )
     assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
+
     local method = "GET"
     local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
     local url = luup.variable_get(MYSID, "RequestURL", dev) or ""
     local pattern = luup.variable_get(MYSID, "Pattern", dev) or "^HTTP/1.. 200"
     local timeout = getVarNumeric("Timeout", 30, dev)
     local trigger = luup.variable_get(MYSID, "Trigger", dev) or nil
-
-    local buf = ""
-    local cond, httpStatus, httpHeaders
-    local matched = false
-    local err = false
-    local matchValue
     
     -- Clear log capture for new request
     logCapture = {}
@@ -426,6 +481,10 @@ local function doMatchQuery( dev )
     end
 
     -- Set up the request table
+    local matched = false
+    local err = true -- guilty until proven innocent
+    local matchValue
+    local buf = ""
     local req =  {
         method = method,
         url = url,
@@ -436,30 +495,33 @@ local function doMatchQuery( dev )
                 -- no more data to process
                 D("doMatchQuery() chunk is nil")
                 if source_err then
-                    return nil, "Source error"
+                    err = true 
+                    return nil, "Source error: "..tostring(source_err)
                 else
                     return true
                 end
             elseif chunk == "" then
+                err = false
                 return true
             else
+                err = false
                 buf = buf .. chunk
                 local l = string.len(buf)
                 D("doMatchQuery() valid chunk, buf now contains %1", l)
-                if l > 2048 then
-                    buf = string.sub(buf, l-2048+1)
-                end
-                local s,e,p
-                s, e, p = string.find(buf, pattern)
-                if s ~= nil then
+                local s, e, p = string.find(buf, pattern)
+                if s then
                     -- LastMatchValue will get the first capture if there is one, otherwise whatever matched
                     if p == nil then
                         matchValue = string.sub(buf, s, e)
                     else
                         matchValue = p
                     end
-                    matched = true
+                    matched = true -- upvalue!
                     return nil, "Matched" -- early exit, fake valid response
+                end
+                -- Reduce buffer to max 2048 bytes
+                if l > 2048 then
+                    buf = string.sub(buf, l-2048+1)
                 end
                 return true
             end
@@ -468,12 +530,13 @@ local function doMatchQuery( dev )
     
     -- HTTP or HTTPS?
     local requestor
-    if url:lower():find("https:") then
+    if url:lower():find("^https:") then
         requestor = https
-        req.verify = luup.variable_get( PRSID, "SSLVerify", dev ) or "none"
-        req.protocol = luup.variable_get( PRSID, "SSLProtocol", dev ) or 'tlsv1'
-        req.options = luup.variable_get( PRSID, "SSLOptions", dev ) or 'all'
-        L("Set up for HTTPS request, verify=%1, protocol=%2, options=%3", 
+        req.verify = getVar( "SSLVerify", "none", dev, MYSID )
+        req.protocol = getVar( "SSLProtocol", nil, dev, MYSID )
+        req.options = getVar( "SSLOptions", nil, dev, MYSID )
+        req.cafile = getVar( "CAFile", nil, dev, MYSID )
+        C(dev, "Set up for HTTPS request, verify=%1, protocol=%2, options=%3", 
             req.verify, req.protocol, req.options)
     else
         requestor = http
@@ -485,44 +548,36 @@ local function doMatchQuery( dev )
     -- connection as soon as we find our pattern string.
     http.TIMEOUT = timeout
     if logRequest then
-        L("HTTP %2 %1, headers=%3", url, method, tHeaders)
+        C(dev, "HTTP %2 %1, headers=%3", url, method, tHeaders)
     end
     D("doMatchQuery() sending req=%1", req)
-    cond, httpStatus, httpHeaders = requestor.request(req)
+    local cond, httpStatus, httpHeaders = requestor.request(req)
     --[[ Notes
         Interesting semantics to the return values here. If the pattern is matched before the body response has been
         completely processed, our sink returns nil (because hey, work is done at that point), but it causes request()
         to return "cond=nil,httpStatus=Matched pattern" (or whatever the sink returned). If no match occurs, the full
         body is read (because the sink keeps looking for the pattern and doesn't find it), but in that case, request()
         returns the expected/documented "cond=1,httpStatus=200" response.
-    ]]
-    D("doMatchQuery() returned from request(), cond=%1, httpStatus=%2, httpHeaders=%3", cond or "nil", httpStatus, httpHeaders)
-    if logRequest then
-        L("Response status %1 with matched %2", httpStatus, matched)
-    end
-
-    -- Handle special errors from socket library
-    if tonumber(httpStatus) == nil then
-        respBody = httpStatus
-        httpStatus = 500
-    end
-
-    if cond == nil or (cond == 1 and httpStatus == 200) then
-        if matched then
-            setMessage("Valid response; matched!", dev)
-        else
-            setMessage("Valid response; no match.", dev)
+    --]]
+    D("doMatchQuery() returned from request(), matched=%1, err=%2, cond=%3, httpStatus=%4, httpHeaders=%5", 
+        matched, err, tostring(cond), httpStatus, httpHeaders)
+    if err or ( cond==nil and httpStatus==nil) then
+        if logRequest then
+            C(dev, "Request failed: %1", httpStatus or "connection failure")
         end
+        setMessage("Request error: " .. ( httpStatus or "connection failure" ), dev)
+        luup.variable_set(MYSID, "LastMatchValue", "", dev)
+        fail(true, dev)
+    else 
+        if logRequest then
+            C(dev, "Request succeeded, %2 match: %1", httpStatus or "OK", matched and "with" or "no" )
+        end
+        setMessage( "Valid response; " .. ( matched and "matched!" or "no match." ), dev )
         local lastVal = luup.variable_get(MYSID, "LastMatchValue", dev)
-        if (lastVal == nil or lastVal ~= matchValue) then
+        if lastVal == nil or lastVal ~= matchValue then
             luup.variable_set(MYSID, "LastMatchValue", matchValue, dev)
         end
         fail(false, dev)
-    else
-        setMessage("Invalid response (" .. tostring(httpStatus) .. ")", dev)
-        luup.variable_set(MYSID, "LastMatchValue", "", dev)
-        fail(true, dev)
-        err = true
     end
 
     -- Set trip state based on result.
@@ -552,15 +607,15 @@ local function doEval( dev, ctx )
     if ctx == nil then 
         local lr = luup.variable_get( MYSID, "LastResponse", dev ) or ""
         if lr == "" then    
-            L("No prior response to evaluate.")
+            C(dev, "No prior response to evaluate.")
             setMessage( "Empty or invalid response data.", dev )
             fail( true, dev )
             return
         end
         local pos, err
-        ctx, pos, err = dkjson.decode( lr )
+        ctx, pos, err = json.decode( lr )
         if err then
-            L("Unable parse stored prior result. That's... unexpected. %1 at %2", err, pos)
+            C(dev, "Unable parse stored prior result. That's... unexpected. %1 at %2", err, pos)
             setMessage( "Invalid JSON in response.", dev )
             fail( true, dev )
             return
@@ -579,19 +634,18 @@ local function doEval( dev, ctx )
     end
 
     -- Valid response. Let's parse it and set our variables.
+    local numexp = getVarNumeric( "NumExp", 8, dev, MYSID )
     ctx.expr = {}
-    for i = 1,8 do
+    for i = 1,numexp do
         local r = nil
-        local ex = luup.variable_get(MYSID, "Expr" .. tostring(i), dev)
+        local ex = luup.variable_get(MYSID, "Expr" .. tostring(i), dev) or ""
         if not logRequest then D("doEval() Expr%1=%2", i, ex or "nil") end
-        if ex ~= nil then
-            if string.len(ex) > 0 then
-                r = parseRefExpr(ex, ctx)
-                if logRequest then L("Eval #%1: %2=(%3)%4", i, ex, type(r), r) end
-                D("doEval() parsed value of %1 is %2", ex, tostring(r))
-                if r == nil then    
-                    numErrors = numErrors + 1
-                end
+        if ex ~= "" then
+            r = parseRefExpr(ex, ctx, dev)
+            if logRequest then C(dev, "Eval #%1: %2=(%3)%4", i, ex, type(r), r) end
+            D("doEval() parsed value of %1 is %2", ex, tostring(r))
+            if r == nil then    
+                numErrors = numErrors + 1
             end
         else
             luup.variable_set(MYSID, "Expr" .. tostring(i), "", dev)
@@ -615,10 +669,36 @@ local function doEval( dev, ctx )
         -- Save to device state if changed.
         local oldVal = luup.variable_get(MYSID, "Value" .. tostring(i), dev)
         D("doEval() newval=(%1)%2 canonical %3, oldVal=%4", type(r), r, rv, oldVal)
-        if rv ~= oldVal then
+        if rv ~= oldVal or debugMode then
             -- Set new value only if changed
             D("doEval() Expr%1 value changed, was %2 now %3", i, oldVal, rv)
             luup.variable_set(MYSID, "Value" .. tostring(i), rv, dev)
+        
+            -- Save to child if exists.
+            local dv = findChild( string.format( "ch%d", i ) )
+            if dv and luup.devices[dv] then
+                local df = dfMap[ luup.devices[dv].device_type ]
+                if df then
+                    -- Note: re-using rv -- convert to sensor form value
+                    if df.datatype == "boolean" then
+                        if type(r) == "boolean" then rv = r and "1" or "0"
+                        elseif type(r) == "number" then rv = (r~=0) and "1" or "0"
+                        elseif type(r) == "string" then
+                            rv = ( #r > 0 and r ~= "false" and r ~= "0" ) and "1" or "0"
+                        else
+                            rv = r ~= nil
+                        end
+                        D("doEval() converting %1(%2) to sensor boolean value %3", r, type(r), rv)
+                    else
+                        rv = tostring(r)
+                    end
+                    D("doEval() converted %1(%2) to sensor %4 value %3", r, type(r), rv, df.datatype)
+                    D("doEval() setting child %1 (#%2) %3/%4=%5", i, dv, df.service, df.variable, rv)
+                    luup.variable_set( df.service or MYSID, df.variable or "CurrentLevel", rv, dv )
+                else
+                    L({level=2,msg="Can't store value for expr %1 to child, no dfMap entry for %2"}, i, luup.devices[dv].device_type)
+                end
+            end
         end
     end
 
@@ -628,14 +708,14 @@ local function doEval( dev, ctx )
     if ttype == "expr" then
         D("doEval() parsing TripExpression %1", texp)
         local r = nil
-        if texp ~= nil then r = parseRefExpr(texp, ctx) end
+        if texp ~= nil then r = parseRefExpr(texp, ctx, dev) end
         if r == nil then numErrors = numErrors + 1 end
         D("doEval() TripExpression result is %1", r)
-        if logRequest then L("Eval trip expression: %1=(%2)%3", texp, type(r), r) end
+        if logRequest then C(dev, "Eval trip expression: %1=(%2)%3", texp, type(r), r) end
         if r == nil
             or ( type(r) == "boolean" and r == false )
             or ( type(r) == "number" and r == 0 )
-            or ( type(r) == "string" and ( string.len(r) == 0 or r == "0" or r == "false" ) ) -- some magic strings
+            or ( type(r) == "string" and ( string.len(r) == 0 or r == "0" or r:lower() == "false" ) ) -- some magic strings
         then
             -- Trip expression is logically (for us) false
             trip(false, dev)
@@ -658,7 +738,7 @@ local function doEval( dev, ctx )
         if msgExpr == "" then
             msg = "Last query succeeded!"
         else
-            msg = parseRefExpr(msgExpr, ctx)
+            msg = parseRefExpr(msgExpr, ctx, dev)
             if msg == nil then msg = "?" end
         end
         fail( false, dev )
@@ -668,7 +748,6 @@ end
 
 local function doJSONQuery(dev)
     assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
     local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
     local url = luup.variable_get(MYSID, "RequestURL", dev) or ""
     local ttype = luup.variable_get(MYSID, "Trigger", dev) or "err"
@@ -677,7 +756,7 @@ local function doJSONQuery(dev)
     logCapture = {}
 
     setMessage("Requesting JSON...", dev)
-    if logRequest then L("Requesting JSON data") end
+    if logRequest then C(dev, "Requesting JSON data") end
     local err,body,httpStatus = doRequest(url, "GET", nil, dev)
     local ctx = { response={}, status={ timestamp=os.time(), valid=0, httpStatus=httpStatus } }
     if body == nil or err then
@@ -688,14 +767,14 @@ local function doJSONQuery(dev)
     else
         D("doJSONQuery() fixing up JSON response for parsing")
         setMessage("Parsing response...", dev)
-        -- Fix booleans, which dkjson doesn't seem to understand (gives nil)
+        -- Fix booleans, which json doesn't seem to understand (gives nil)
         body = string.gsub( body, ": *true *,", ": 1," )
         body = string.gsub( body, ": *false *,", ": 0," )
 
         -- Process JSON response. First parse response.
-        local t, pos, e = dkjson.decode(body)
+        local t, _, e = json.decode(body)
         if e then
-            L("Unable to decode JSON response, %2 (dev %1)", dev, e)
+            C(dev, "Unable to decode JSON response, %2 (dev %1)", dev, e)
             -- If TripExpression isn't used, trip follows status
             fail(true, dev)
             if ttype == "err" then trip(true, dev) end
@@ -711,7 +790,7 @@ local function doJSONQuery(dev)
             fail(false, dev)
             
             -- Save the response
-            luup.variable_set( MYSID, "LastResponse", dkjson.encode( ctx ), dev )
+            luup.variable_set( MYSID, "LastResponse", json.encode( ctx ), dev )
         end
     end
 
@@ -720,7 +799,6 @@ end
 
 local function checkVersion(dev)
     assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
     D("checkVersion() branch %1 major %2 minor %3, string %4, openLuup %5", luup.version_branch, luup.version_major, luup.version_minor, luup.version, isOpenLuup)
     if isOpenLuup or ( luup.version_branch == 1 and luup.version_major >= 7 ) then
         return true
@@ -730,11 +808,11 @@ end
 
 local function runOnce(dev)
     assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
     local rev = getVarNumeric("Version", 0, dev)
-    if (rev == 0) then
+    if rev == 0 then
         -- Initialize for new installation
         D("runOnce() Performing first-time initialization!")
+        luup.variable_set(MYSID, "DebugMode", 0, dev)
         luup.variable_set(MYSID, "Message", "", dev)
         luup.variable_set(MYSID, "RequestURL", "", dev)
         luup.variable_set(MYSID, "Interval", "1800", dev)
@@ -747,6 +825,10 @@ local function runOnce(dev)
         luup.variable_set(MYSID, "LastRun", "0", dev)
         luup.variable_set(MYSID, "LogRequests", "0", dev)
         luup.variable_set(MYSID, "EvalInterval", "", dev)
+        luup.variable_set(MYSID, "SSLVerify", "", dev)
+        luup.variable_set(MYSID, "SSLProtocol", "", dev)
+        luup.variable_set(MYSID, "SSLOptions", "", dev)
+        luup.variable_set(MYSID, "CAFile", "", dev)
 
         luup.variable_set(SSSID, "Armed", "0", dev)
         luup.variable_set(SSSID, "Tripped", "0", dev)
@@ -755,7 +837,7 @@ local function runOnce(dev)
         luup.variable_set(HASID, "ModeSetting", "1:;2:;3:;4:", dev )
         
         luup.attr_set( "category_num", 4, dev )
-        luup.attr_set( "subcategory_num", "", dev )
+        luup.attr_set( "subcategory_num", 0, dev )
         
         luup.variable_set(MYSID, "Version", _CONFIGVERSION, dev)
         return
@@ -780,7 +862,16 @@ local function runOnce(dev)
     if rev < 10900 then
         D("runOnce() Upgrading config to 10900")
         luup.attr_set( "category_num", 4, dev )
-        luup.attr_set( "subcategory_num", "", dev )
+        luup.attr_set( "subcategory_num", 0, dev )
+    end
+    
+    if rev < 11000 then
+        luup.variable_set( MYSID, "DebugMode", 0, dev )
+        luup.variable_set( MYSID, "NumExp", 8, dev )
+        luup.variable_set(MYSID, "SSLVerify", "", dev)
+        luup.variable_set(MYSID, "SSLProtocol", "", dev)
+        luup.variable_set(MYSID, "SSLOptions", "", dev)
+        luup.variable_set(MYSID, "CAFile", "", dev)
     end
     
     -- No matter what happens above, if our versions don't match, force that here/now.
@@ -797,13 +888,11 @@ function runQuery(p)
     local stepStamp,dev
     
     stepStamp,dev = string.match(p, "(%d+):(%d+)")
-    dev = tonumber(dev,10)
-    assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
+    dev = tonumber(dev,10) or error "Invalid device number"
     
     stepStamp = tonumber(stepStamp, 10)
-    if stepStamp ~= idata[dev].runStamp then
-        D("runQuery() stamp mismatch (got %1, expected %2). Newer thread running! I'm out...", stepStamp, idata[dev].runStamp)
+    if stepStamp ~= runStamp then
+        D("runQuery() stamp mismatch (got %1, expected %2). Newer thread running! I'm out...", stepStamp, runStamp)
         return
     end
     
@@ -822,7 +911,7 @@ function runQuery(p)
         local queryArmed = getVarNumeric("QueryArmed", 1, dev)
         if queryArmed == 0 or isArmed(dev) then
 
-            -- Timestamp -- should we not do this if the query fails?
+            -- Mark time, always, even if the query fails.
             luup.variable_set(MYSID, "LastQuery", timeNow, dev)
 
             -- What type of query?
@@ -835,7 +924,7 @@ function runQuery(p)
             -- Disarmed and querying only when armed. No reschedule.
             D("runQuery() disarmed, query disabled; not rescheduling.")
             setMessage("Disarmed; query skipped.", dev)
-            idata[dev].runStamp = 0
+            runStamp = runStamp + 1
             return
         end
     elseif qtype == "json" then
@@ -854,17 +943,14 @@ end
 local function forceUpdate(dev)
     D("forceUpdate(%1)", dev)
     assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
     luup.variable_set( MYSID, "LastQuery", 0, dev )
-    idata[dev].runStamp = os.time()
-    scheduleNext(dev, 1, idata[dev].runStamp)
+    runStamp = runStamp + 1
+    scheduleNext(dev, 1, runStamp)
 end
 
 function arm(dev)
     D("arm(%1) arming!", dev)
-    D("arm() luup.device is %1", luup.device)
     assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
     if not isArmed(dev) then
         luup.variable_set(SSSID, "Armed", "1", dev)
         -- Do not set ArmedTripped; Luup semantics
@@ -875,7 +961,6 @@ end
 function disarm(dev)
     D("disarm(%1) disarming!", dev)
     assert(dev ~= nil)
-    assert(idata[dev] ~= nil)
     if isArmed(dev) then
         luup.variable_set(SSSID, "Armed", "0", dev)
     end
@@ -892,6 +977,11 @@ function requestLogging( dev, enabled )
     end
 end
 
+function actionDoRequest( dev )
+    L("Request by action")
+    forceUpdate( dev )
+end
+
 function actionSetDebug( dev, state )
     D("actionSetDebug(%1,%2)", dev, state)
     if state == 1 or state == "1" or state == true or state == "true" then 
@@ -900,7 +990,7 @@ function actionSetDebug( dev, state )
     end
 end
 
-local function getDevice( dev, pdev, v )
+local function getDevice( dev, pdev, v ) -- luacheck: ignore 212
     if v == nil then v = luup.devices[dev] end
     local devinfo = { 
           devNum=dev
@@ -915,17 +1005,149 @@ local function getDevice( dev, pdev, v )
         , manufacturer = luup.attr_get( "manufacturer", dev ) or ""
         , model = luup.attr_get( "model", dev ) or ""
     }
-    local rc,t,httpStatus
-    rc,t,httpStatus = luup.inet.wget("http://localhost/port_3480/data_request?id=status&DeviceNum=" .. dev .. "&output_format=json", 15)
+    local req = string.format( "http://localhost%s/data_request?id=status&DeviceNum=%d&output_format=json", 
+        isOpenLuup and ":3480" or "/port_3480", dev )
+    local rc,t,httpStatus = luup.inet.wget( req, 15 )
     if httpStatus ~= 200 or rc ~= 0 then 
         devinfo['_comment'] = string.format( 'State info could not be retrieved, rc=%d, http=%d', rc, httpStatus )
         return devinfo
     end
-    local d = dkjson.decode(t)
+    local d = json.decode(t)
     local key = "Device_Num_" .. dev
     if d ~= nil and d[key] ~= nil and d[key].states ~= nil then d = d[key].states else d = nil end
     devinfo.states = d or {}
     return devinfo
+end
+
+function init(dev)
+    D("init(%1)", dev)
+    L("starting version %1 device %2 (#%3)", _PLUGIN_VERSION, luup.devices[dev].description, dev)
+    
+    -- Initialize instance data
+    pluginDevice = dev
+    runStamp = 0
+    isOpenLuup = false
+    isALTUI = false
+    logCapture = {}
+    myChildren = {}
+    if getVarNumeric( "DebugMode", 0, dev, MYSID ) ~= 0 then
+        debugMode = true
+        D("init() debug enabled by DebugMode state variable")
+    end
+    
+    -- Check for ALTUI and OpenLuup; find children.
+    for k,v in pairs(luup.devices) do
+        if v.device_type == "urn:schemas-upnp-org:device:altui:1" and v.device_num_parent == 0 then
+            D("init() detected ALTUI at %1", k)
+            isALTUI = true
+            local rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin", 
+                { 
+                    newDeviceType=MYTYPE, 
+                    newScriptFile="J_SiteSensor1_ALTUI.js", 
+                    newDeviceDrawFunc="SiteSensor_ALTUI.DeviceDraw",
+                    newFavoriteFunc="SiteSensor_ALTUI.Favorite"
+                }, k )
+            D("init() ALTUI's RegisterPlugin action returned resultCode=%1, resultString=%2, job=%3, returnArguments=%4", rc,rs,jj,ra)
+        elseif v.device_type == "openLuup" then
+            D("init() detected openLuup")
+            isOpenLuup = true
+            
+        elseif v.device_num_parent == dev then
+            D("init() found child %1", v.id)
+            myChildren[ v.id ] = k
+        end
+    end
+
+    -- Make sure we're in the right environment
+    if not checkVersion(dev) then
+        setMessage("Unsupported firmware", dev)
+        L("This plugin is currently supported only in UI7; buh-bye!")
+        luup.set_failure( 1, dev )
+        return false, "Unsupported firmware", _PLUGIN_NAME
+    end
+
+    -- See if we need any one-time inits
+    runOnce(dev)
+    
+    -- Other inits
+    math.randomseed( os.time() )
+    
+    -- Check that any child devices have been created.
+    D("init() assessing children...")
+    local numchild = getVarNumeric( "NumExp", 8, dev, MYSID )
+    local ptr = luup.chdev.start( dev )
+    local changed = false
+    for ix=1,numchild do
+        local childid = string.format( "ch%d", ix )
+        local childtype = luup.variable_get( MYSID, "Child" .. tostring(ix), dev ) or ""
+        D("init() child id %1 type %2", childid, childtype)
+        if childtype ~= "" then
+            -- We should have a child.
+            local devnum = myChildren[ childid ]
+            D("init() child id %1 found devnum %2 luup.device=%3", childid, devnum, luup.devices[devnum])
+            if devnum then
+                local v = luup.devices[ devnum ]
+                -- We do. Right type?
+                if v.device_type == childtype then
+                    -- Yes. Append (existing)
+                    local df = dfMap[ v.device_type ]
+                    if df then
+                        luup.chdev.append( dev, ptr, v.id, v.description, "", df.device_file, "", "", false )
+                        local s = getVarNumeric( "Version", 0, devnum, MYSID )
+                        if s == 0 then
+                            -- First-time init for child
+                            L("Performing first-time inits for %1", childid)
+                            luup.attr_set( "category_num", df.category, devnum )
+                            luup.attr_set( "subcategory_num", df.subcategory or 0, devnum )
+                            luup.variable_set( MYSID, "Version", _CONFIGVERSION, devnum )
+                        end
+                    else
+                        L({level=1,msg="Missing dfMap entry for %1; child for expr %2 will be removed."}, v.device_type, ix)
+                        changed = true
+                    end
+                else
+                    L("Child for expr %1 type changed from %2 to %3, removing child; this will cause a Luup reload.",
+                        ix, v.device_type, childtype)
+                    changed = true
+                end
+            else 
+                -- Missing child. Append.
+                local df = dfMap[ childtype ]
+                if df then
+                    local desc = " " .. tostring(ix)
+                    desc = luup.attr_get( "name", dev ):sub(1, 20-#desc) .. desc
+                    luup.chdev.append( dev, ptr, childid, desc, "", df.device_file, "", "", false )
+                    L("Creating new child device for expr %1; this will cause a Luup reload.", ix)
+                    changed = true
+                else
+                    L({level=1,msg="Missing dfMap entry for %1"}, childtype)
+                end
+            end
+        else
+            -- Child where we don't need one?
+            if myChildren[childid] then
+                L("Child for expr %1 no longer needed, removing; this will cause a Luup reload.", ix)
+                changed = true
+            end
+        end
+    end
+    if changed then
+        L({level=2,msg="Child device devices; this will cause a Luup reload now."})
+    end
+    luup.chdev.sync( dev, ptr )
+    
+    -- If JSON-type query, re-eval last response right now to make sure sensors
+    -- are updated.
+    local qtype = luup.variable_get(MYSID, "ResponseType", dev) or "text"
+    if qtype == "json" then
+        doEval( dev, nil ) -- no context, will fetch last stored.
+    end
+    
+    -- Schedule next query.
+    runStamp = 1
+    scheduleNext(dev, nil, runStamp)
+    
+    return true, "OK", _PLUGIN_NAME
 end
 
 function requestHandler(lul_request, lul_parameters, lul_outputformat)
@@ -941,13 +1163,13 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
         -- ImperiHome ISS Standard System API, see http://dev.evertygo.com/api/iss#types
         local path = lul_parameters['path'] or action:sub( 4 ) -- Work even if I'home user forgets &path=
         if path == "/system" then
-            return dkjson.encode( { id="SiteSensor-" .. luup.pk_accesspoint, apiversion=1 } ), "application/json"
+            return json.encode( { id="SiteSensor-" .. luup.pk_accesspoint, apiversion=1 } ), "application/json"
         elseif path == "/rooms" then
             local roomlist = { { id=0, name="No Room" } }
             for rn,rr in pairs( luup.rooms ) do 
                 table.insert( roomlist, { id=rn, name=rr } )
             end
-            return dkjson.encode( { rooms=roomlist } ), "application/json"
+            return json.encode( { rooms=roomlist } ), "application/json"
         elseif path == "/devices" then
             local devices = {}
             for lnum,ldev in pairs( luup.devices ) do
@@ -984,7 +1206,7 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
                     end
                 end
             end
-            return dkjson.encode( { devices=devices } ), "application/json"
+            return json.encode( { devices=devices } ), "application/json"
         else
             D("requestHandler: command %1 not implemented, ignored", action)
             return "{}", "application.json"
@@ -992,7 +1214,7 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
     end
     
     if action == "status" then
-        if dkjson == nil then return "Missing dkjson library", "text/plain" end
+        if json == nil then return "Missing json library", "text/plain" end
         local st = {
             name=_PLUGIN_NAME,
             version=_PLUGIN_VERSION,
@@ -1017,7 +1239,27 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
                 table.insert( st.devices, devinfo )
             end
         end
-        return dkjson.encode( st ), "application/json"
+        return json.encode( st ), "application/json"
+        
+    elseif action == "getvtypes" then
+        local r = {}
+        if isOpenLuup then
+            -- For openLuup, only show device types for resources that are installed
+            local loader = require "openLuup.loader"
+            if loader.find_file ~= nil then
+                for k,v in pairs( dfMap ) do
+                    if loader.find_file( v.device_file ) then 
+                        r[k] = v
+                    end
+                end
+            else
+                L{level=1,msg="PLEASE UPGRADE YOUR OPENLUUP TO 181122 OR HIGHER FOR FULL SUPPORT OF SITESENSOR VIRTUAL DEVICES"}
+            end
+        else
+            r = dfMap
+        end
+        return json.encode( r ), "application/json"
+                
     end
     
     return "<html><head><title>" .. _PLUGIN_NAME .. " Request Handler"
@@ -1027,49 +1269,4 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
         .. "<p>Imperihome ISS URL: <tt>...&action=ISS&path=</tt><p>Documentation: <a href='"
         .. _PLUGIN_URL .. "' target='_blank'>" .. _PLUGIN_URL .. "</a></body></html>"
         , "text/html"
-end
-
-function init(dev)
-    D("init(%1)", dev)
-    L("starting plugin version %1 device %2", _PLUGIN_VERSION, dev)
-    -- Initialize instance data
-    idata[dev] = {}
-    
-    -- Check for ALTUI and OpenLuup
-    for k,v in pairs(luup.devices) do
-        if v.device_type == "urn:schemas-upnp-org:device:altui:1" then
-            D("init() detected ALTUI at %1", k)
-            isALTUI = true
-            local rc,rs,jj,ra = luup.call_action("urn:upnp-org:serviceId:altui1", "RegisterPlugin", 
-                { 
-                    newDeviceType=MYTYPE, 
-                    newScriptFile="J_SiteSensor1_ALTUI.js", 
-                    newDeviceDrawFunc="SiteSensor_ALTUI.DeviceDraw",
-                    newFavoriteFunc="SiteSensor_ALTUI.Favorite"
-                }, k )
-            D("init() ALTUI's RegisterPlugin action returned resultCode=%1, resultString=%2, job=%3, returnArguments=%4", rc,rs,jj,ra)
-        elseif v.device_type == "openLuup" then
-            D("init() detected openLuup")
-            isOpenLuup = true
-        end
-    end
-
-    -- Make sure we're in the right environment
-    if not checkVersion(dev) then
-        setMessage("Unsupported firmware", dev)
-        L("This plugin is currently supported only in UI7; buh-bye!")
-        return false
-    end
-
-    -- See if we need any one-time inits
-    runOnce(dev)
-    
-    -- Other inits
-    math.randomseed( os.time() )
-
-    -- Schedule next query.
-    idata[dev].runStamp = os.time()
-    scheduleNext(dev, nil, idata[dev].runStamp)
-    
-    return true, "OK", _PLUGIN_NAME
 end

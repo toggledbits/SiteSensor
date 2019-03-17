@@ -1,5 +1,13 @@
 # CHANGELOG #
 
+## Version 1.10 (released)
+
+* Support for more than 8 (default) expressions in JSON requests. This is currently done by setting the NumExp state variable.
+* Support virtual sensors as target value containers for expression results on Vera Luup. This feature is not available on openLuup.
+* Add SSL control state variables SSLVerify, SSLProtocol, SSLOptions, and CAFile, which pass their values through to the underlying library.
+* Improved error feedback to user on match queries, particularly when connection errors occur.
+* Implement `DoRequest` action to force immediate request and update.
+
 ## Version 1.9 (released) ##
 
 * Make category and subcategory assignment more definitive.

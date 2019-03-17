@@ -1,5 +1,16 @@
 //# sourceURL=J_SiteSensor1_UI7.js
-var SiteSensor = (function(api) {
+/**
+ * J_SiteSensor_UI7.js
+ * Configuration interface for SiteSensor
+ *
+ * Copyright 2016,2017,2019 Patrick H. Rigney, All Rights Reserved.
+ * This file is part of Reactor. For license information, see LICENSE at https://github.com/toggledbits/SiteSensor
+ */
+/* globals api,Utils,jQuery,$ */
+
+//"use strict"; // fails on UI7, works fine with ALTUI
+
+var SiteSensor = (function(api, $) {
 
     // unique identifier for this plugin...
     var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
@@ -7,9 +18,11 @@ var SiteSensor = (function(api) {
     var serviceId = "urn:toggledbits-com:serviceId:SiteSensor1";
 
     var myModule = {};
-    
-    var isVisible = false;
 
+    var isVisible = false;
+    var isOpenLuup = false;
+    // var isALTUI = false;
+    
     function updateResponseFields() {
         var rtype = jQuery('select#rtype').val();
         jQuery('select#trigger option[value="match"]').attr('disabled', rtype != "text");
@@ -34,8 +47,15 @@ var SiteSensor = (function(api) {
         // console.log('handler for before cpanel close');
         isVisible = false;
     }
-
+    
     function initPlugin() {
+        var ud = api.getUserData();
+        for (var i=0; i < ud.devices.length; ++i ) {
+            if ( ud.devices[i].device_type == "openLuup" && ud.devices[i].id_parent == 0 ) {
+                isOpenLuup = true;
+                break;
+            }
+        }
     }
 
     function configurePlugin()
@@ -44,8 +64,8 @@ var SiteSensor = (function(api) {
             initPlugin();
 
             var myDevice = api.getCpanelDeviceId();
-            
-            var i, j, roomObj, roomid, html = "";
+
+            var html = "";
 
             html += "<style>";
             html += ".tb-cgroup { padding: 0px 32px 0px 0px }";
@@ -111,17 +131,25 @@ var SiteSensor = (function(api) {
             html += "<input type=\"text\" size=\"64\" id=\"tripexpression\" />";
 
             // Expressions for drawing out field values
+            var numexp = parseInt( api.getDeviceState( myDevice, serviceId, "NumExp" ) || 8 );
+            if ( isNaN( numexp ) ) {
+                numexp = 8;
+            }
             html += "<h2>Value Expressions</h2>";
-            html += "<p>Use these expressions to draw values from the response JSON data and store them in state variables. You can use these values as triggers for scenes and Lua scripts.</p>";
+            html += "<p>Use these expressions to draw values from the response JSON data and store them in state variables. You can use these values as triggers for scenes and Lua scripts.";
+            html += " You can also push the expression values out to virtual sensors (created children of this SiteSensor) for use with scene triggers, Reactor, etc. <span id='openluupvirtual'/>";
+            html += "</p>";
             html += "<ol>";
-            for (var ix=1; ix<=8; ix += 1) {
-                html += '<li><input class="jsonexpr" id="expr' + ix + '" size="64" type="text"></li>';
+            for (var ix=1; ix<=numexp; ix += 1) {
+                html += '<li><input class="jsonexpr" id="expr' + ix + '" size="64" type="text">';
+                html += ' Child sensor: <select class="childtype" id="child' + ix + '"><option value="">(none)</option></select>';
+                html += '</li>';
             }
             html += "</ol>";
 
             html += '<p>The JSON data is encapsulated within a "response" key, so if your JSON data looks like the example below, the value <i>errCode</i> would be accessed by the expression <tt>response.errCode</tt>, while the value of <i>name</i> within the <i>type</i> key would be accessed using <tt>response.type.name</tt>. Refer to the <a href="https://www.toggledbits.com/sitesensor" target="_blank">plug-in documentation</a> for more details. Since SiteSensor uses <a href="https://www.toggledbits.com/luaxp" target="_blank">LuaXP</a> to evaluate expressions, you can also look at its <a href="https://www.toggledbits.com/luaxp/expressions" target="_blank">expression syntax</a> and <a href="https://www.toggledbits.com/luaxp/functions" target="_blank">built-in function reference</a> for guidance.</p>';
             html += "<code>{\n    \"errCode\": 0,\n    \"type\": {\n        \"name\": \"Normal\",\n        \"class\": \"apiobject\"\n    }\n}</code>";
-            
+
             html += "<h2>Options</h2>";
             html += '<label for="reeval">Re-evaluate the expressions</label>&nbsp;<select id="reeval"><option value="">only immediately after requests (default)</option>';
             html += '<option value="60">every minute</option>';
@@ -213,7 +241,7 @@ var SiteSensor = (function(api) {
                 var newExpr = jQuery(this).val();
                 api.setDeviceStatePersistent(myDevice, serviceId, "TripExpression", newExpr, 0);
             });
-            
+
             s = api.getDeviceState(myDevice, serviceId, "EvalInterval");
             if (s) {
                 // If the currently selected option isn't on the list, add it, so we don't lose it.
@@ -229,15 +257,52 @@ var SiteSensor = (function(api) {
                 api.setDeviceStatePersistent(myDevice, serviceId, "EvalInterval", newVal, 0);
             });
 
-            $('input.jsonexpr').each( function( obj ) {
-                var ix = $(this).attr('id').substr(4);
-                var s = api.getDeviceState(myDevice, serviceId, "Expr" + ix);
-                if (s) $(this).val(s);
-            });
-            $('input.jsonexpr').change( function( obj ) {
-                var newExpr = $(this).val();
-                var ix = $(this).attr('id').substr(4);
-                api.setDeviceStatePersistent(myDevice, serviceId, "Expr" + ix, newExpr, 0);
+            jQuery.ajax({
+                url: api.getDataRequestURL(),
+                data: {
+                    id: "lr_SiteSensor",
+                    action: "getvtypes"
+                },
+                dataType: "json",
+                timeout: 5000
+            }).done( function( data, statusText, jqXHR ) {
+                var hasOne = false;
+                var childMenu = jQuery( '<select/>' );
+                for ( var ch in data ) {
+                    if ( data.hasOwnProperty( ch ) ) {
+                        childMenu.append( jQuery( '<option/>' ).val( ch ).text( data[ch].name || ch ) );
+                        hasOne = hasOne || ch != "urn:schemas-upnp-org:device:BinaryLight:1";
+                    }
+                }
+                if ( ! hasOne ) {
+                    jQuery( 'span#openluupvirtual' ).append( ' <b>Additional resources are required to be installed for openLuup. Please refer to <a href="https://github.com/toggledbits/SiteSensor" target="_blank">the GitHub repository for documentation</a>.</b>' );
+                }
+                childMenu = childMenu.children();
+                jQuery( 'select.childtype' ).append( childMenu ).on( 'change.sitesensor', function( ev ) {
+                    var el = jQuery( ev.currentTarget );
+                    var id = el.attr( 'id' ).substr( 5 );
+                    api.setDeviceStatePersistent( api.getCpanelDeviceId(), serviceId, "Child" + id, el.val() || "" );
+                });
+                jQuery( 'input.jsonexpr' ).each( function( obj ) {
+                    var ix = jQuery( this ).attr('id').substr(4);
+                    var s = ( api.getDeviceState(myDevice, serviceId, "Expr" + ix) || "" ).trim();
+                    jQuery( this ).val(s);
+                    var typ = api.getDeviceState(myDevice, serviceId, "Child" + ix) || "";
+                    jQuery( 'select#child' + ix + '.childtype' ).val( typ ).prop( 'disabled', "" === s );
+                });
+                jQuery( 'input.jsonexpr' ).change( function( obj ) {
+                    var newExpr = ( jQuery(this).val() || "" ).trim();
+                    var ix = jQuery(this).attr('id').substr(4);
+                    api.setDeviceStatePersistent(myDevice, serviceId, "Expr" + ix, newExpr, 0);
+                    if ( "" === newExpr ) {
+                        jQuery( 'select#child' + ix + '.childtype' ).val( "" ).change().prop( 'disabled', true );
+                    } else {
+                        jQuery( 'select#child' + ix + '.childtype' ).prop( 'disabled', false );
+                    }
+                });
+            }).fail( function( jqXHR ) {
+                jQuery( 'select.childtype' ).prop( 'disabled', true );
+                alert( "There was an error loading configuration data. Vera may be busy; try again in a moment." );
             });
 
             updateResponseFields();
@@ -247,16 +312,16 @@ var SiteSensor = (function(api) {
             Utils.logError('Error in SiteSensor.configurePlugin(): ' + e);
         }
     }
-    
+
     function ipath( i ) {
         return 'https://www.toggledbits.com/assets/sitesensor/' + i + '.png';
     }
-    
+
     function itag( i ) {
         var id = i.replace(/-(off|on)$/i, "");
         return '<img src="' + ipath( i ) + '" id="' + id + '" alt="' + id + '">';
     }
-    
+
     function updateIndicators() {
         var devNum = api.getCpanelDeviceId();
 
@@ -277,7 +342,7 @@ var SiteSensor = (function(api) {
             st = st.replace(/[|]/g, "\n");
             jQuery("div#sitesensor-log textarea").val(st);
         }
-        
+
         /* Periodic refresh */
         setTimeout( updateIndicators, 1000 );
     }
@@ -287,28 +352,29 @@ var SiteSensor = (function(api) {
             var html = "";
 
             var devNum = api.getCpanelDeviceId();
-            
+
             var st = api.getDeviceStateVariable(devNum, "urn:toggledbits-com:serviceId:SiteSensor1", "HideStatusIndicator");
             if ( st == "1" || st == "true" ) {
                 return;
             }
-            
-            html += '<div id="sitesensor-status" style="width: 418px; margin: auto; border: groove 5px #999999;">' + itag("status-left")
-                + itag("status-indicator-caution-on")
-                + itag("status-indicator-armed-off")
-                + itag("status-indicator-tripped-off")
-                + itag("status-right") 
-                + '</div>';
-                
+
+            html += '<div id="sitesensor-status" style="width: 418px; margin: auto; border: groove 5px #999999;">' +
+                itag("status-left") +
+                itag("status-indicator-caution-on") +
+                itag("status-indicator-armed-off") +
+                itag("status-indicator-tripped-off") +
+                itag("status-right") +
+                '</div>';
+
             html += '<div id="sitesensor-log" style="width: 630px; margin: auto; padding-top: 8px;"><textarea wrap="off" style="width: 100%; height: 146px; padding: 4px 4px 4px 4px; background-color: #f8f8f8; font-family: monospace; font-size: 12px;"></textarea>';
-            
+
             // Push generated HTML to page
             api.setCpanelContent(html);
-            
+
             isVisible = true;
 
             api.registerEventHandler('on_ui_cpanel_before_close', SiteSensor, 'onBeforeCpanelClose');
-            
+
             updateIndicators();
         } catch (e) {
             Utils.logError("Error in SiteSensor1.controlPanel(): " + e);
@@ -323,4 +389,4 @@ var SiteSensor = (function(api) {
         controlPanel: controlPanel
     };
     return myModule;
-})(api);
+})(api, jQuery);
