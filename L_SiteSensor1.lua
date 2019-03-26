@@ -17,7 +17,7 @@ local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
 local _PLUGIN_VERSION = "1.11develop-19084"
 local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
-local _CONFIGVERSION = 11000
+local _CONFIGVERSION = 19085
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local MYTYPE = "urn:schemas-toggledbits-com:device:SiteSensor:1"
@@ -222,7 +222,9 @@ local function fail(failState, dev)
         local fval = failState and 1 or 0
         luup.variable_set(MYSID, "Failed", fval, dev or pluginDevice)
     end
-    luup.set_failure( failState and 1 or 0, dev or pluginDevice )
+    if getVarNumeric( "DeviceErrorOnFailure", 1, dev, SSSID ) ~= 0 then
+        luup.set_failure( failState and 1 or 0, dev or pluginDevice )
+    end
 end
 
 local function isArmed(dev)
@@ -830,6 +832,7 @@ local function runOnce(dev)
         luup.variable_set(MYSID, "SSLProtocol", "", dev)
         luup.variable_set(MYSID, "SSLOptions", "", dev)
         luup.variable_set(MYSID, "CAFile", "", dev)
+        luup.variable_set( MYSID, "DeviceErrorOnFailure", 1, dev )
 
         luup.variable_set(SSSID, "Armed", "0", dev)
         luup.variable_set(SSSID, "Tripped", "0", dev)
@@ -873,6 +876,10 @@ local function runOnce(dev)
         luup.variable_set(MYSID, "SSLProtocol", "", dev)
         luup.variable_set(MYSID, "SSLOptions", "", dev)
         luup.variable_set(MYSID, "CAFile", "", dev)
+    end
+
+    if rev < 19085 then
+        luup.variable_set( MYSID, "DeviceErrorOnFailure", 1, dev )
     end
 
     -- No matter what happens above, if our versions don't match, force that here/now.
@@ -1136,6 +1143,8 @@ function init(dev)
         L({level=2,msg="Child device devices; this will cause a Luup reload now."})
     end
     luup.chdev.sync( dev, ptr )
+
+    luup.set_failure( 0, dev )
 
     -- If JSON-type query, re-eval last response right now to make sure sensors
     -- are updated.
