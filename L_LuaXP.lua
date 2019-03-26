@@ -12,7 +12,7 @@ module("L_LuaXP", package.seeall)
 
 local _M = {}
 
-_VERSION = "0.9.9stable-19015"
+_VERSION = "0.9.9stable-19084"
 _VNUMBER = 000909
 _DEBUG = false -- Caller may set boolean true or function(msg)
 
