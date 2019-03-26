@@ -17,7 +17,7 @@ Currently, only HTTP/HTTPS GET queries are supported, but future plans include s
 
 SiteSensor has been tested on openLuup with AltUI.
 
-SiteSensor is written and supported by Patrick Rigney, aka rigpapa on the [Vera forums](http://http://forum.micasaverde.com/).
+SiteSensor is written and supported by Patrick Rigney (rigpapa) on the [Vera forums](https://community.getvera.com/t/new-plugin-sitesensor/197026/1).
 
 For more information, see <http://www.toggledbits.com/sitesensor/>.
 

@@ -12,7 +12,7 @@ module("L_LuaXP", package.seeall)
 
 local _M = {}
 
-_VERSION = "0.9.9stable-19015"
+_VERSION = "0.9.9stable-19084"
 _VNUMBER = 000909
 _DEBUG = false -- Caller may set boolean true or function(msg)
 
@@ -59,10 +59,10 @@ local NULLATOM = { __type=TNUL }
 
 local charmap = { t = "\t", r = "\r", n = "\n" }
 
-local reservedWords = { 
+local reservedWords = {
       ['false']=false, ['true']=true
     , pi=math.pi, PI=math.pi
-    , ['null']=NULLATOM, ['NULL']=NULLATOM, ['nil']=NULLATOM 
+    , ['null']=NULLATOM, ['NULL']=NULLATOM, ['nil']=NULLATOM
 }
 
 function dump(t, seen)
