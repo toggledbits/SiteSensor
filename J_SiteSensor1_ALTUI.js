@@ -1,7 +1,7 @@
 //# sourceURL=J_SiteSensor1_ALTUI.js
 /**
  * J_SiteSensor1_ALTUI.js
- * Copyright 2018 Patrick H. Rigney, All Rights Reserved. 
+ * Copyright 2018 Patrick H. Rigney, All Rights Reserved.
  * AltUI special UI implementation for SiteSensor devices.
  */
 /* globals MultiBox,ALTUI_PluginDisplays,_T */
@@ -26,7 +26,7 @@ var SiteSensor_ALTUI = ( function( window, undefined ) {
                 html += '</div>';
                 return html;
         }
-        
+
         function _favorite( device ) {
             var html = "";
             var val = MultiBox.getStatus( device, "urn:toggledbits-com:serviceId:SiteSensor1", "Value1" ) || "";
@@ -34,7 +34,7 @@ var SiteSensor_ALTUI = ( function( window, undefined ) {
             html += "<span class='altui-favorites-mediumtext'>" + val + '</span>';
             return html;
         }
-        
+
     return {
         /* convenience exports */
         toggleArmed: function (altuiid, htmlid) {

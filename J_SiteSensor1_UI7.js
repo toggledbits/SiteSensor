@@ -12,6 +12,8 @@
 
 var SiteSensor = (function(api, $) {
 
+    var pluginVersion = "1.11develop-19084";
+
     // unique identifier for this plugin...
     var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
 
@@ -22,7 +24,7 @@ var SiteSensor = (function(api, $) {
     var isVisible = false;
     var isOpenLuup = false;
     // var isALTUI = false;
-    
+
     function updateResponseFields() {
         var rtype = jQuery('select#rtype').val();
         jQuery('select#trigger option[value="match"]').attr('disabled', rtype != "text");
@@ -47,7 +49,7 @@ var SiteSensor = (function(api, $) {
         // console.log('handler for before cpanel close');
         isVisible = false;
     }
-    
+
     function initPlugin() {
         var ud = api.getUserData();
         for (var i=0; i < ud.devices.length; ++i ) {
@@ -158,7 +160,7 @@ var SiteSensor = (function(api, $) {
 
             html += "</div>"; // tb-jsoncontrols
 
-			html += '<hr><p><b>Find SiteSensor useful?</b> Please consider supporting the project with <a href="https://www.toggledbits.com/donate">a small donation</a>. I am grateful for any support you choose to give!</p>';
+			html += '<hr><p>SiteSensor ver ' + pluginVersion + ' Copyright 2018,2019 Patrick H. Rigney, All Rights Reserved<br/><b>Find SiteSensor useful?</b> Please consider supporting the project with <a href="https://www.toggledbits.com/donate">a small donation</a>. I am grateful for any support you choose to give!</p>';
 
             // Push generated HTML to page
             api.setCpanelContent(html);
