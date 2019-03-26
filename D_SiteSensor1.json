@@ -631,8 +631,8 @@
                 }
             }
         },
-        
-        
+
+
         {
             "id": 7,
             "label": {
@@ -1313,8 +1313,8 @@
                 }
             }]
         }
-        
-        
+
+
     ],
     "device_type": "urn:schemas-toggledbits-com:device:SiteSensor:1"
 }
