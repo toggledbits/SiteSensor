@@ -1,5 +1,10 @@
 # CHANGELOG #
 
+## Version 1.11 (released)
+
+* Fix timezone offset problem in request parameter substitution;
+* Add `DeviceErrorOnFailure` state variable to control behavior when queries fail (1=default, fail state also sets Luup device failure status, 0=do not set Luup device status).
+
 ## Version 1.10 (released)
 
 * Support for more than 8 (default) expressions in JSON requests. This is currently done by setting the NumExp state variable.
