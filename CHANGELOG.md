@@ -1,6 +1,6 @@
 # CHANGELOG #
 
-## Version 1.12 (develop)
+## Version 1.12 (stable-19103)
 
 * Allow use of `curl` as a conduit for JSON requests by setting `UseCurl`. This works around some limitations in LuaSec that we can't resolve easily, or at all.
 * Capture raw response to JSON request if it's not exorbitantly large.

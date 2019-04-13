@@ -15,7 +15,7 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.12"
+local _PLUGIN_VERSION = "1.12stable-19103"
 local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 19103
 
