@@ -1,38 +1,39 @@
 <?xml version="1.0"?>
+<!-- D_SiteSensor1.xml -->
 <root xmlns="urn:schemas-upnp-org:device-1-0">
-    <specVersion>
-        <major>1</major>
-        <minor>0</minor>
-    </specVersion>
-    <device>
-        <deviceType>urn:schemas-toggledbits-com:device:SiteSensor:1</deviceType>
-        <staticJson>D_SiteSensor1.json</staticJson>
-        <friendlyName>Site Sensor</friendlyName>
-        <manufacturer>rigpapa</manufacturer>
-        <manufacturerURL>http://www.toggledbits.com/sitesensor/</manufacturerURL>
-        <modelDescription>Site Sensor</modelDescription>
-        <modelName>Site Sensor</modelName>
-        <handleChildren>0</handleChildren>
-        <Category_Num>4</Category_Num>
-        <serviceList>
-          <service>
-            <serviceType>urn:schemas-toggledbits-com:service:SiteSensor:1</serviceType>
-            <serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
-            <SCPDURL>S_SiteSensor1.xml</SCPDURL>
-          </service>
-          <service>
-            <serviceType>urn:schemas-micasaverde-com:service:SecuritySensor:1</serviceType>
-            <serviceId>urn:micasaverde-com:serviceId:SecuritySensor1</serviceId>
-            <SCPDURL>S_SecuritySensor1.xml</SCPDURL>
-          </service>
-          <service>
-            <serviceType>urn:schemas-micasaverde-com:service:HaDevice:1</serviceType>
-            <serviceId>urn:micasaverde-com:serviceId:HaDevice1</serviceId>
-            <SCPDURL>S_HaDevice1.xml</SCPDURL>
-          </service>
-        </serviceList>
-        <implementationList>
-          <implementationFile>I_SiteSensor1.xml</implementationFile>
-        </implementationList>
-    </device>
+	<specVersion>
+		<major>1</major>
+		<minor>0</minor>
+	</specVersion>
+	<device>
+		<deviceType>urn:schemas-toggledbits-com:device:SiteSensor:1</deviceType>
+		<staticJson>D_SiteSensor1.json</staticJson>
+		<friendlyName>Site Sensor</friendlyName>
+		<manufacturer>rigpapa</manufacturer>
+		<manufacturerURL>http://www.toggledbits.com/sitesensor/</manufacturerURL>
+		<modelDescription>Site Sensor</modelDescription>
+		<modelName>Site Sensor</modelName>
+		<handleChildren>0</handleChildren>
+		<Category_Num>4</Category_Num>
+		<serviceList>
+		  <service>
+			<serviceType>urn:schemas-toggledbits-com:service:SiteSensor:1</serviceType>
+			<serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+			<SCPDURL>S_SiteSensor1.xml</SCPDURL>
+		  </service>
+		  <service>
+			<serviceType>urn:schemas-micasaverde-com:service:SecuritySensor:1</serviceType>
+			<serviceId>urn:micasaverde-com:serviceId:SecuritySensor1</serviceId>
+			<SCPDURL>S_SecuritySensor1.xml</SCPDURL>
+		  </service>
+		  <service>
+			<serviceType>urn:schemas-micasaverde-com:service:HaDevice:1</serviceType>
+			<serviceId>urn:micasaverde-com:serviceId:HaDevice1</serviceId>
+			<SCPDURL>S_HaDevice1.xml</SCPDURL>
+		  </service>
+		</serviceList>
+		<implementationList>
+		  <implementationFile>I_SiteSensor1.xml</implementationFile>
+		</implementationList>
+	</device>
 </root>
