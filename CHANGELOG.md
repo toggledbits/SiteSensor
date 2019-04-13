@@ -1,5 +1,12 @@
 # CHANGELOG #
 
+## Version 1.12 (develop)
+
+* Allow use of `curl` as a conduit for JSON requests by setting `UseCurl`. This works around some limitations in LuaSec that we can't resolve easily, or at all.
+* Capture raw response to JSON request if it's not exorbitantly large.
+* Handle no-data responses better--be more definitive in showing the user that no data was returned (otherwise, it's misleading).
+* When failing parent device, also fail child devices.
+
 ## Version 1.11 (released)
 
 * Fix timezone offset problem in request parameter substitution;
