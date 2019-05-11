@@ -15,8 +15,8 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.12stable-19103"
-local _PLUGIN_URL = "http://www.toggledbits.com/sitesensor"
+local _PLUGIN_VERSION = "1.12develop-19130"
+local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 19103
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
@@ -628,6 +628,34 @@ local function doMatchQuery( dev )
 	luup.variable_set( MYSID, "LastResponse", "", dev )
 end
 
+-- Find device by number, name or UDN
+local function finddevice( dev, tdev )
+	local vn
+	if type(dev) == "number" then
+		if dev == -1 then return tdev end
+		return dev
+	elseif type(dev) == "string" then
+		if dev == "" then return tdev end
+		dev = string.lower( dev )
+		if dev:sub(1,5) == "uuid:" then
+			for n,d in pairs( luup.devices ) do
+				if string.lower( d.udn ) == dev then
+					return n
+				end
+			end
+		else
+			for n,d in pairs( luup.devices ) do
+				if string.lower( d.description ) == dev then
+					return n
+				end
+			end
+		end
+		vn = tonumber( dev )
+	end
+	return vn
+end
+
+
 local function doEval( dev, ctx )
 	local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
 	local numErrors = 0
@@ -665,6 +693,24 @@ local function doEval( dev, ctx )
 		setMessage( msg, dev )
 		fail( true, dev )
 		return
+	end
+
+	ctx.__functions = ctx.__functions or {}
+	ctx.__functions.finddevice = function( args )
+		local selector, trouble = unpack( args )
+		D("findDevice(%1) selector=%2", args, selector)
+		return finddevice( selector, dev ) or ( trouble and luaxp.evalerror( "Device not found" ) or luaxp.NULL )
+	end
+	ctx.__functions.getstate = function( args )
+		local selector, svc, var, trouble = unpack( args )
+		local vn = finddevice( selector, dev )
+		D("getstate(%1), selector=%2, svc=%3, var=%4, vn(dev)=%5", args, selector, svc, var, vn)
+		if vn == luaxp.NULL or vn == nil or luup.devices[vn] == nil then
+			-- default behavior for getstate() is error (legacy, diff from finddevice)
+			return trouble and luaxp.evalerror( "Device not found" ) or luaxp.NULL
+		end
+		-- Get and return value
+		return luup.variable_get( svc, var, vn ) or luaxp.NULL
 	end
 
 	-- Valid response. Let's parse it and set our variables.
@@ -1191,7 +1237,7 @@ function init(dev)
 	-- are updated.
 	local qtype = luup.variable_get(MYSID, "ResponseType", dev) or "text"
 	if qtype == "json" then
-		doEval( dev, nil ) -- no context, will fetch last stored.
+		doEval( dev ) -- no context, will reproduce it.
 	end
 
 	-- Schedule next query.
