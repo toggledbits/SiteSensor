@@ -1,6 +1,6 @@
 # CHANGELOG #
 
-## Version 1.12 (develop)
+## Version 1.12 (released)
 
 * Implement `finddevice()` and `getstate()` extensions functions to LuaXP, identical to their Reactor counterparts.
 * Allow use of `curl` as a conduit for JSON requests by setting `UseCurl`. This works around some limitations in LuaSec that we can't resolve easily, or at all.
