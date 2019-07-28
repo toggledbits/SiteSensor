@@ -473,7 +473,11 @@ local function doRequest(url, method, body, dev)
 		httpStatus = 500
 	end
 
-	luup.variable_set( MYSID, "RawResponse", respBody or "nil!", dev )
+	if #respBody > 32768 then
+		luup.variable_set( MYSID, "RawResponse", respBody or "nil!", dev )
+	else
+		luup.variable_set( MYSID, "RawResponse", '{ "error": "response is too long to store, '..#respBody..' bytes" }', dev )
+	end
 
 	-- See what happened. Anything 2xx we reduce to 200 (OK).
 	if httpStatus >= 200 and httpStatus <= 299 then
@@ -624,8 +628,12 @@ local function doMatchQuery( dev )
 	end
 	trip(newTrip, dev)
 
-	-- Clear LastResponse, which is only used for JSON requests
+	-- Clear JSON request fields
 	luup.variable_set( MYSID, "LastResponse", "", dev )
+	local numexp = getVarNumeric( "NumExp", 8, dev, MYSID )
+	for k=1,numexp do
+		luup.variable_set(MYSID, "Value" .. tostring(k), "", dev)
+	end
 end
 
 -- Find device by number, name or UDN
@@ -667,7 +675,7 @@ local function doEval( dev, ctx )
 	if ctx == nil then
 		local lr = luup.variable_get( MYSID, "LastResponse", dev ) or ""
 		if lr == "" then
-			C(dev, "No prior response to evaluate.")
+			C(dev, "No prior response stored to re-evaluate.")
 			setMessage( "Empty or invalid response data.", dev )
 			fail( true, dev )
 			return
@@ -846,9 +854,26 @@ local function doJSONQuery(dev)
 		D("doJSONQuery() setting tripped and bugging out...")
 		fail(true, dev)
 		if ttype == "err" then trip(true, dev) end
-		luup.variable_set( MYSID, "LastResponse", json.encode( ctx ), dev )
+		if getVarNumeric( "EvalInterval", 0, dev ) > 0 then
+			-- Eval interval, store last response for re-eval
+			local lr = json.encode( ctx )
+			if not lr or type(lr) ~= "string" then
+				C(dev, "Unable to encode response for storage; re-evaluation is not possible.")
+				luup.variable_set( MYSID, "LastResponse", "", dev )
+			elseif #lr > getVarNumeric( "LastResponseLimit", 65536, dev ) then
+				C(dev, "Site response is too large to store for re-evaluation (%1 bytes received)", #lr)
+				luup.variable_set( MYSID, "LastResponse", "", dev )
+			else
+				luup.variable_set( MYSID, "LastResponse", lr, dev )
+			end
+		else
+			luup.variable_set( MYSID, "LastResponse", "", dev )
+		end
 	else
-		D("doJSONQuery() fixing up JSON response for parsing")
+		if #body >= 128072 then
+			C(dev, "WARNING: the response from this site is quite large! (%1 bytes)", #body)
+		end
+		D("doJSONQuery() fixing up JSON response (%1 bytes) for parsing", #body)
 		setMessage("Parsing response...", dev)
 		-- Fix booleans, which json doesn't seem to understand (gives nil)
 		body = string.gsub( body, ": *true *,", ": 1," )
@@ -1003,8 +1028,8 @@ function runQuery(p)
 	if timeNow >= ( last + interval ) then
 
 		-- We may only query when armed, so check that.
-		local queryArmed = getVarNumeric("QueryArmed", 1, dev)
-		if queryArmed == 0 or isArmed(dev) then
+		local queryArmed = getVarNumeric("QueryArmed", 1, dev) ~= 0
+		if isArmed(dev) or not queryArmed then
 
 			-- Mark time, always, even if the query fails.
 			luup.variable_set(MYSID, "LastQuery", timeNow, dev)
@@ -1019,6 +1044,7 @@ function runQuery(p)
 			-- Disarmed and querying only when armed. No reschedule.
 			D("runQuery() disarmed, query disabled; not rescheduling.")
 			setMessage("Disarmed; query skipped.", dev)
+			luup.variable_set( SSSID, "Tripped", "0", dev )
 			runStamp = runStamp + 1
 			return
 		end
@@ -1058,6 +1084,9 @@ function disarm(dev)
 	assert(dev ~= nil)
 	if isArmed(dev) then
 		luup.variable_set(SSSID, "Armed", "0", dev)
+	end
+	if getVarNumeric( "QueryArmed", 1, dev ) ~= 0 then
+		luup.variable_set(SSSID, "Tripped", "0", dev)
 	end
 	-- Do not set ArmedTripped; Luup semantics
 end
@@ -1231,19 +1260,16 @@ function init(dev)
 	end
 	luup.chdev.sync( dev, ptr )
 
-	luup.set_failure( 0, dev )
-
-	-- If JSON-type query, re-eval last response right now to make sure sensors
-	-- are updated.
-	local qtype = luup.variable_get(MYSID, "ResponseType", dev) or "text"
-	if qtype == "json" then
-		doEval( dev ) -- no context, will reproduce it.
+	-- If sensor is query armed, and not armed, clear tripped explicitly.
+	if getVarNumeric( "QueryArmed", 1, dev ) ~= 0 and not isArmed( dev ) then
+		luup.variable_set( SSSID, "Tripped", "0", dev )
 	end
 
 	-- Schedule next query.
 	runStamp = 1
 	scheduleNext(dev, nil, runStamp)
 
+	luup.set_failure( 0, dev )
 	return true, "OK", _PLUGIN_NAME
 end
 
