@@ -1,5 +1,10 @@
 # CHANGELOG #
 
+## Version 1.13 (released)
+
+* Prevent really large responses from being stored for history/re-evaluation. This results in potentially excessive size of state variables, and thus Luup's `user_data` structure.
+* Update to latest version of LuaXP.
+
 ## Version 1.12 (released)
 
 * Implement `finddevice()` and `getstate()` extensions functions to LuaXP, identical to their Reactor counterparts.
