@@ -1,5 +1,9 @@
 # CHANGELOG #
 
+## Version 1.14 (released)
+
+* Fix a bug in handling of very long responses that causes them to sometimes be stored when they should be skipped. Not generally a problem for anyone, but the idea is to avoid over-bloating user_data, and if that doesn't work right consistently, goal not achieved.
+
 ## Version 1.13 (released)
 
 * Prevent really large responses from being stored for history/re-evaluation. This results in potentially excessive size of state variables, and thus Luup's `user_data` structure.
