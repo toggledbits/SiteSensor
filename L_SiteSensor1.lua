@@ -15,7 +15,7 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.13"
+local _PLUGIN_VERSION = "1.14develop-19237"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 19103
 
@@ -474,9 +474,9 @@ local function doRequest(url, method, body, dev)
 	end
 
 	if #respBody > 32768 then
-		luup.variable_set( MYSID, "RawResponse", respBody or "nil!", dev )
-	else
 		luup.variable_set( MYSID, "RawResponse", '{ "error": "response is too long to store, '..#respBody..' bytes" }', dev )
+	else
+		luup.variable_set( MYSID, "RawResponse", respBody or "nil!", dev )
 	end
 
 	-- See what happened. Anything 2xx we reduce to 200 (OK).
@@ -854,21 +854,7 @@ local function doJSONQuery(dev)
 		D("doJSONQuery() setting tripped and bugging out...")
 		fail(true, dev)
 		if ttype == "err" then trip(true, dev) end
-		if getVarNumeric( "EvalInterval", 0, dev ) > 0 then
-			-- Eval interval, store last response for re-eval
-			local lr = json.encode( ctx )
-			if not lr or type(lr) ~= "string" then
-				C(dev, "Unable to encode response for storage; re-evaluation is not possible.")
-				luup.variable_set( MYSID, "LastResponse", "", dev )
-			elseif #lr > getVarNumeric( "LastResponseLimit", 65536, dev ) then
-				C(dev, "Site response is too large to store for re-evaluation (%1 bytes received)", #lr)
-				luup.variable_set( MYSID, "LastResponse", "", dev )
-			else
-				luup.variable_set( MYSID, "LastResponse", lr, dev )
-			end
-		else
-			luup.variable_set( MYSID, "LastResponse", "", dev )
-		end
+		luup.variable_set( MYSID, "LastResponse", "", dev )
 	else
 		if #body >= 128072 then
 			C(dev, "WARNING: the response from this site is quite large! (%1 bytes)", #body)
@@ -896,9 +882,22 @@ local function doJSONQuery(dev)
 			ctx.status.jsonStatus = "OK"
 			ctx.response = t
 			fail(false, dev)
+		end
 
-			-- Save the response
-			luup.variable_set( MYSID, "LastResponse", json.encode( ctx ), dev )
+		if getVarNumeric( "EvalInterval", 0, dev ) > 0 then
+			-- Eval interval, store last response for re-eval
+			local lr = json.encode( ctx )
+			if not lr or type(lr) ~= "string" then
+				C(dev, "Unable to encode response for storage; re-evaluation is not possible.")
+				luup.variable_set( MYSID, "LastResponse", "", dev )
+			elseif #lr > getVarNumeric( "LastResponseLimit", 65536, dev ) then
+				C(dev, "Site response is too large to store for re-evaluation (%1 bytes received)", #lr)
+				luup.variable_set( MYSID, "LastResponse", "", dev )
+			else
+				luup.variable_set( MYSID, "LastResponse", lr, dev )
+			end
+		else
+			luup.variable_set( MYSID, "LastResponse", "", dev )
 		end
 	end
 
