@@ -20,6 +20,13 @@
 	<actionList>
 		<action>
 			<serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
+			<name>SetEnabled</name>
+			<run>
+				return SiteSensor.actionSetEnabled( lul_device, lul_settings.newEnabledValue )
+			</run>
+		</action>
+		<action>
+			<serviceId>urn:toggledbits-com:serviceId:SiteSensor1</serviceId>
 			<name>GetInterval</name>
 			<run>
 				return -- what we do here doesn't matter, luup uses the relatedStateVariable directly

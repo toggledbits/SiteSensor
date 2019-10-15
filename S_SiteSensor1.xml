@@ -19,6 +19,12 @@
 			<shortCode>interval</shortCode>
 		</stateVariable>
 		<stateVariable sendEvents="yes">
+			<name>Enabled</name>
+			<dataType>boolean</dataType>
+			<defaultValue>1</defaultValue>
+			<shortCode>enabled</shortCode>
+		</stateVariable>
+		<stateVariable sendEvents="yes">
 			<name>LastMatchValue</name>
 			<dataType>string</dataType>
 			<defaultValue></defaultValue>
@@ -78,6 +84,16 @@
 		</stateVariable>
 	</serviceStateTable>
 	<actionList>
+		<action>
+			<name>SetEnabled</name>
+			<argumentList>
+				<argument>
+					<name>newEnabledValue</name>
+					<relatedStateVariable>Enabled</relatedStateVariable>
+					<direction>in</direction>
+				</argument>
+			</argumentList>
+		</action>
 		<action>
 			<name>SetInterval</name>
 			<argumentList>

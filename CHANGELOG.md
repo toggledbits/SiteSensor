@@ -1,5 +1,9 @@
 # CHANGELOG #
 
+## Version 1.15 (development)
+
+* Add `SetEnabled` action (parameter `newEnabledValue`) to set enable/disable state of a SiteSensor. When disabled, queries are not run. This provides an alternate mechanism to the arm/disarm control to control queries without Luup notifications that accompany security sensor arming state. Requested by whyfseeguy.
+
 ## Version 1.14 (released)
 
 * Fix a bug in handling of very long responses that causes them to sometimes be stored when they should be skipped. Not generally a problem for anyone, but the idea is to avoid over-bloating user_data, and if that doesn't work right consistently, goal not achieved.

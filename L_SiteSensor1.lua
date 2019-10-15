@@ -15,9 +15,9 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.14"
+local _PLUGIN_VERSION = "1.15develop-19288"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
-local _CONFIGVERSION = 19103
+local _CONFIGVERSION = 19288
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local MYTYPE = "urn:schemas-toggledbits-com:device:SiteSensor:1"
@@ -206,6 +206,10 @@ local function getVarNumeric( name, dflt, dev, serviceId )
 	local s = luup.variable_get(serviceId or MYSID, name, dev or pluginDevice) or ""
 	if s == "" then return dflt end
 	return tonumber(s) or dflt
+end
+
+local function isEnabled( dev )
+	return getVarNumeric( "Enabled", 1, dev, MYSID ) ~= 0
 end
 
 local function setMessage(s, dev)
@@ -919,6 +923,7 @@ local function runOnce(dev)
 	if rev == 0 then
 		-- Initialize for new installation
 		D("runOnce() Performing first-time initialization!")
+		luup.variable_set(MYSID, "Enabled", 1, dev)
 		luup.variable_set(MYSID, "DebugMode", 0, dev)
 		luup.variable_set(MYSID, "Message", "", dev)
 		luup.variable_set(MYSID, "RequestURL", "", dev)
@@ -993,6 +998,10 @@ local function runOnce(dev)
 		luup.variable_set(MYSID, "CurlOptions", "", dev)
 	end
 
+	if rev < 19288 then
+		luup.variable_set(MYSID, "Enabled", "1", dev)
+	end
+
 	-- No matter what happens above, if our versions don't match, force that here/now.
 	if (rev ~= _CONFIGVERSION) then
 		luup.variable_set(MYSID, "Version", _CONFIGVERSION, dev)
@@ -1013,6 +1022,11 @@ function runQuery(p)
 	if stepStamp ~= runStamp then
 		D("runQuery() stamp mismatch (got %1, expected %2). Newer thread running! I'm out...", stepStamp, runStamp)
 		return
+	end
+
+	if not isEnabled( dev ) then
+		L("Query skipped; disabled.")
+		return -- without rescheduling
 	end
 
 	-- Are we doing an eval tick, or running a request?
@@ -1098,6 +1112,18 @@ function requestLogging( dev, enabled )
 	else
 		luup.variable_set( MYSID, "LogRequests", "0", dev )
 	end
+end
+
+function actionSetEnabled( dev, newVal )
+	D("actionSetEnabled(%1,%2)", dev, newVal)
+	newVal = tonumber( newVal ) or 1
+	local enabled = newVal ~= 0
+	if enabled ~= isEnabled( dev ) then
+		-- Change
+		luup.variable_set( MYSID, "Enabled", enabled and "1" or "0", dev )
+		if enabled then forceUpdate( dev ) end
+	end
+	return true
 end
 
 function actionDoRequest( dev )
