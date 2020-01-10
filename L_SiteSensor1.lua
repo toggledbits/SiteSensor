@@ -443,7 +443,7 @@ local function doRequest(url, method, body, dev)
 		if url:lower():find("https:") then
 			requestor = https
 			req.verify = getVar( "SSLVerify", "none", dev, MYSID )
-			req.protocol = getVar( "SSLProtocol", nil, dev, MYSID )
+			req.protocol = getVar( "SSLProtocol", "tlsv1", dev, MYSID )
 			local s = split( getVar( "SSLOptions", nil, dev, MYSID ) or "" )
 			if #s > 0 then req.options = s end
 			req.cafile = getVar( "CAFile", nil, dev, MYSID )
@@ -573,7 +573,7 @@ local function doMatchQuery( dev )
 	if url:lower():find("^https:") then
 		requestor = https
 		req.verify = getVar( "SSLVerify", "none", dev, MYSID )
-		req.protocol = getVar( "SSLProtocol", nil, dev, MYSID )
+		req.protocol = getVar( "SSLProtocol", "tlsv1", dev, MYSID )
 		req.options = getVar( "SSLOptions", nil, dev, MYSID )
 		req.cafile = getVar( "CAFile", nil, dev, MYSID )
 		C(dev, "Set up for HTTPS request, verify=%1, protocol=%2, options=%3",
@@ -685,7 +685,7 @@ local function doEval( dev, ctx )
 			return
 		end
 		local pos, err
-		ctx, pos, err = json.decode( lr )
+		ctx, pos, err = json.decode( lr, 1, luaxp.NULL )
 		if err then
 			C(dev, "Unable parse stored prior result. That's... unexpected. %1 at %2", err, pos)
 			setMessage( "Invalid JSON in response.", dev )
@@ -870,7 +870,7 @@ local function doJSONQuery(dev)
 		body = string.gsub( body, ": *false *,", ": 0," )
 
 		-- Process JSON response. First parse response.
-		local t, _, e = json.decode(body)
+		local t, _, e = json.decode(body, 1, luaxp.NULL)
 		if e then
 			C(dev, "Unable to decode JSON response, %2 (dev %1)", dev, e)
 			-- If TripExpression isn't used, trip follows status
