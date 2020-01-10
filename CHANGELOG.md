@@ -2,7 +2,8 @@
 
 ## Version 1.15 (development)
 
-* Add `SetEnabled` action (parameter `newEnabledValue`) to set enable/disable state of a SiteSensor. When disabled, queries are not run. This provides an alternate mechanism to the arm/disarm control to control queries without Luup notifications that accompany security sensor arming state. Requested by whyfseeguy.
+* Fix: Make sure dkjson decodes "null" to LuaXP's *null* value rather than Lua `nil`.
+* Enhancement: Add `SetEnabled` action (parameter `newEnabledValue`) to set enable/disable state of a SiteSensor. When disabled, queries are not run. This provides an alternate mechanism to the arm/disarm control to control queries without Luup notifications that accompany security sensor arming state. Requested by whyfseeguy.
 
 ## Version 1.14 (released)
 
