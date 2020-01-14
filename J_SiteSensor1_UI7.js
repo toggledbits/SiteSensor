@@ -7,12 +7,13 @@
  * This file is part of Reactor. For license information, see LICENSE at https://github.com/toggledbits/SiteSensor
  */
 /* globals api,Utils,jQuery,$ */
+/* jshint multistr: true */
 
 //"use strict"; // fails on UI7, works fine with ALTUI
 
 var SiteSensor = (function(api, $) {
 
-	var pluginVersion = "1.15develop-20009RC";
+	var pluginVersion = "1.15develop-20014";
 
 	// unique identifier for this plugin...
 	var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
@@ -24,6 +25,10 @@ var SiteSensor = (function(api, $) {
 	var isVisible = false;
 	var isOpenLuup = false;
 	// var isALTUI = false;
+
+	/* Recipe variables. Exprn are handled separately. */
+	var recipeVars = [ "RequestURL", "Headers", "Interval", "Timeout", "QueryArmed",
+					   "ResponseType", "Trigger", "NumExp", "TripExpression" ];
 
 	function updateResponseFields() {
 		var rtype = jQuery('select#rtype').val();
@@ -383,12 +388,181 @@ var SiteSensor = (function(api, $) {
 		}
 	}
 
+	function handleRecipeChange( ev ) {
+		var $el = $("#origdata");
+		$('textarea#loadrecipe').empty();
+		$('button#applyrecipe').prop('disabled',true);
+		var recipe = $el.val();
+		var lines = [];
+		try {
+			var data = JSON.parse( recipe );
+			if ( String( data.name || "" ).match( /^\s*$/ ) ) { throw "Field 'name' is required for recipe name"; }
+			if ( String( data.version || "" ).match( /^\s*$/ ) ) { throw "Field 'version' is required"; }
+			if ( String( data.author || "" ).match( /^\s*$/ ) ) { throw "Field 'author' is required"; }
+			data.timestamp = Date.now();
+			var blk = btoa( recipe );
+			lines.push( "=== Ident: " + data.name + " version " + data.version + " by " + 
+				data.author + "; " + 
+				String(data.description||"").replace( /[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, "" ) );
+			lines.push( "=== BEGIN SITESENSOR RECIPE ===" );
+			while ( blk.length > 76 ) {
+				lines.push( blk.substring( 0, 76 ) );
+				blk = blk.substring( 76 );
+			}
+			lines.push( blk );
+			lines.push( "=== END SITESENSOR RECIPE ===" );
+		} catch (ex) {
+			lines.push( "*** INVALID CONFIGURATION -- SEE BELOW ***");
+			lines.push(String(ex));
+			var m = ex.toString().match( /at position (\d+)/ );
+			if ( m ) {
+				var at = parseInt( m[1] );
+				var p1 = Math.max( 0, at-16 );
+				var p2 = Math.min( at+16, recipe.length );
+				lines.push( recipe.substring( p1, p2 ) );
+			}
+		}
+		$("#blockdata").val( lines.join( "\n" ) );
+	}
+
+	function makeCurrentRecipe( myid ) {
+		var name = api.getDeviceAttribute( myid, "name" ) || myid;
+		var data = { "name":name, "author": "", version: "", description: "", config:{} };
+		data.version = Math.floor( Date.now() / 1000 );
+		var nvars = recipeVars.length;
+		for ( var ix=0; ix<recipeVars.length; ix++ ) {
+			data.config[recipeVars[ix]] = api.getDeviceState( myid, serviceId, recipeVars[ix] ) || "";
+		}
+		data.source = api.getDeviceState( myid, serviceId, "Version" ) || 0;
+		var numexp = parseInt( data.config.NumExp ) || 8;
+		for ( ix=1; ix<=numexp; ix++ ) {
+			var exname = "Expr" + ix;
+			data.config[exname] = api.getDeviceState( myid, serviceId, exname ) || "";
+		}
+		var recipe = JSON.stringify( data, null, 4 );
+		$( '#origdata' ).val( recipe );
+		handleRecipeChange();
+	}
+
+	function handleApply() {
+		if ( confirm( "Applying this recipe will overwrite this SiteSensor's configuration. OK?" ) ) {
+			var $el = $( 'textarea#loadrecipe' );
+			var recipe = $el.val() || "";
+			var p1 = recipe.replace( /[\r\n]/g, "" ).match( /=== BEGIN SITESENSOR RECIPE ===(.*)=== END SITESENSOR RECIPE ===/im );
+			var blk = atob( p1[1] );
+			var data = JSON.parse( blk );
+			var devnum = api.getCpanelDeviceId();
+			/* Make a list of all variables we need */
+			var found = {};
+			for ( var ix=0; ix<recipeVars.length; ++ix ) { found[recipeVars[ix]] = true; }
+			for ( var vname in data.config ) {
+				/* Don't set any variables we don't know about */
+				if ( data.config.hasOwnProperty( vname ) && found[vname] ) {
+					delete found[vname]; /* mark */
+					api.setDeviceStateVariablePersistent( devnum, serviceId, vname, data.config[vname], {
+						onSuccess: function() {},
+						onFailure: function() {}
+					} );
+				}
+			}
+			/* Clear any variables we need that the config didn't have */
+			for ( vname in found ) {
+				if ( found.hasOwnProperty( vname ) ) {
+					console.log("Clearing "+vname+"; not in recipe");
+					api.setDeviceStateVariablePersistent( devnum, serviceId, vname, "" );
+				}
+			}
+			/* Get the expressions */
+			var numexp = parseInt( data.config.NumExp ) || 8;
+			for ( ix=1; ix<numexp; ++ix ) {
+				vname = "Expr" + ix;
+				api.setDeviceStateVariablePersistent( devnum, serviceId, vname, data.config[vname] || "" );
+			}
+			/* Done! */
+			$( '.recipealert' ).text("Recipe applied!");
+			$( '#origdata' ).val( JSON.stringify( data, null, 4 ) );
+			handleRecipeChange();
+		}
+	}
+
+	function handleLoadChange() {
+		var $el = $( 'textarea#loadrecipe' );
+		var recipe = $el.val() || "";
+		var p1 = recipe.replace( /[\r\n]/g, "" ).match( /=== BEGIN SITESENSOR RECIPE ===(.*)=== END SITESENSOR RECIPE ===/i );
+		var msg = "Invalid block.";
+		if ( p1 ) {
+			try {
+				var blk = atob( p1[1] );
+				var data = JSON.parse( blk );
+				$( 'button#applyrecipe' ).prop( 'disabled', false );
+				$( '.recipealert' ).text( "Ready to apply " + String(data.name) + " version " +
+					String( data.version ) +
+					". This will overwrite the current configuration of this SiteSensor!" );
+				var recv = parseInt( data.source ) || 0;
+				var sysv = parseInt( api.getDeviceState( api.getCpanelDeviceId(), serviceId, "Version" ) ) || 0;
+				if ( recv > sysv ) {
+					$( '.recipealert' ).append("<strong>&bull; Note: this recipe was made by a later version of SiteSensor. It may not be fully compatible with the version you are using.</strong>");
+				}
+				return;
+			} catch (ex) {
+				console.log(ex);
+			}
+		} else if ( recipe.match( /^\s*$/ ) ) {
+			msg = "";
+		} else {
+			msg = "Invalid block. Make sure you keep the header and footer strings with the pasted block.";
+		}
+		$( 'button#applyrecipe' ).prop( 'disabled', true );
+		$( '.recipealert' ).text( msg );
+	}
+
+	function doRecipe( myid ) {
+		api.setCpanelContent( '<style>\
+textarea#loadrecipe { font-family: monospace; width: 100%; height: 6em; } \
+textarea#origdata { width: 100%; font-family: monospace; min-height: 20em; outline: none; } \
+textarea#blockdata { width: 100%; font-family: monospace; height: 6em; outline: none; } \
+</style> \
+<div class="sise-recipe"> \
+	<h2>Load a Recipe</h2> \
+	<p>Recipes are pre-packaged configurations that you can load quickly. To load a recipe, paste it into the box below. You\'ll be asked to confirm the recipe content before it is applied to this SiteSensor.</p> \
+	<textarea id="loadrecipe" placeholder="Paste the recipe here"></textarea> \
+	<div class="recipealert" />\
+	<div id="loadcontrol"><button id="applyrecipe" class="btn btn-sm btn-warning">Apply This Recipe</button></div> \
+	<hr/>\
+	<h2>Create a Recipe</h2> \
+	<p>Have you made a SiteSensor configuration from which others may benefit? You can share this SiteSensor\'s configuration with others by creating a recipe. \
+	   <b>Edit the configuration below to remove any authorization keys or other sensitive data. Do not remove any key/value pairs, but you can leave the value blank (no data between quotes) if you must.</b> \
+	This editing does not change this SiteSensor"s configuration. As you edit, the block data representation \
+	below will be updated. When you are satisfied with your edits, you can select and copy the \
+	block data representation--<em>that</em> is the recipe you publish. Try not to break the JSON formatting of this configuration data. If you do, an error message will be shown below to help guide you to a fix; sometimes pasting the broken configuration into <a href="http://www.jsonlint.com/" target="_blank">jsonlint.com</a> will also help.</p><p>Hint: This is also a really good way to back up a SiteSensor configurations &mdash; you don\'t have to publish your recipes.</p></p><br/> \
+	<textarea id="origdata" wrap="off"></textarea> \
+	<p>Below is the block data representation -- this is what you publish.</p> \
+	<textarea id="blockdata"></textarea></div> \
+</div><hr/><div class="sise-footer">Thanks for using SiteSensor!</div>' );
+
+		$( 'button#applyrecipe' ).prop( 'disabled', true )
+			.on( "click", handleApply );
+
+		$( 'textarea#loadrecipe' ).on( "change", handleLoadChange )
+			.on( "input", handleLoadChange );
+
+		$( '#origdata' )
+			.on( "input", handleRecipeChange )
+			.on( "change", handleRecipeChange );
+
+		$( '#blockdata' )
+			.on( "mouseup", function() { $(this).get(0).select(); } )
+			.on( "input", handleRecipeChange );
+		makeCurrentRecipe( myid );
+	}
+
 	myModule = {
 		uuid: uuid,
 		initPlugin: initPlugin,
 		onBeforeCpanelClose: onBeforeCpanelClose,
 		configurePlugin: configurePlugin,
-		controlPanel: controlPanel
+		controlPanel: controlPanel,
+		doRecipe: function() { try { doRecipe( api.getCpanelDeviceId() ); } catch(ex) { console.log(ex); alert(ex); } }
 	};
 	return myModule;
 })(api, jQuery);

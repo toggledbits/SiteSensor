@@ -15,7 +15,7 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.15develop-20009RC"
+local _PLUGIN_VERSION = "1.15develop-20014"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 19288
 
@@ -1407,6 +1407,42 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
 			r = dfMap
 		end
 		return json.encode( r ), "application/json"
+		
+	elseif action == "recipe" then
+		local recipe = { name=luup.devices[deviceNum].description, version=os.time(), config={} }
+		recipe.signature = [["']]
+		for _,v in ipairs( { "RequestURL", "Interval", "Timeout", "QueryArmed", "ResponseType", "Trigger", "NumExp", "TripExpression" } ) do
+			local val = luup.variable_get( MYSID, v, deviceNum ) or ""
+			recipe.config[v] = val
+		end
+		for ix=1,(tonumber(recipe.config.NumExp) or 8) do
+			recipe.config['Expr'..ix] = luup.variable_get( MYSID, "Expr"..ix, deviceNum ) or ""
+		end
+		r = [[<h2>Current Config</h2><pre>]]
+		r = r .. json.encode(recipe, { indent=true })
+		r = r .. [[</pre><p>You can copy-paste the above, but be careful not to paste it into Word or other text editors or tools that would alter the quotes or content. A plain-text editor is the best tool. <b>Be sure to remove any auth keys or other private data before posting publicly!</b></p><h2>Load New Recipe</h2><form method="post" action="data_request"><input type="hidden" name="id" value="lr_SiteSensor"><input type="hidden" name="action" value="loadrecipe"><input type="hidden" name="device" value="]] .. deviceNum .. [["><label>Recipe:<textarea name="rdata" wrap="soft" rows="4" cols="80"></textarea></label><br/>Loading the recipe will overwrite this SiteSensor's current configuration. OK/ready? <input type="submit" name="submit" value="Load Recipe"></form>]]
+		return r, "text/html"
+		
+	elseif action == "loadrecipe" then
+		local recipe = lul_parameters.rdata or ""
+		local pos,ends = recipe:find( "=== BEGIN SITESENSOR RECIPE ===%s+" )
+		if pos then
+			recipe = recipe:sub( ends + 1 ):gsub( "=== END SITESENSOR RECIPE ===.*", "" )
+			local mime = require "mime"
+			recipe = mime.unb64( recipe )
+			if not recipe then return "ERROR\nInvalid recipe: can't decode/invalid block format", "text/plain" end
+		else
+			if not recipe:find( [[signature:%s*"%\"'"]] ) then
+				return "ERROR\nInvalid recipe: quote corruption", "text/html"
+			end
+		end
+		local data,err = json.decode( recipe )
+		if not data then return "ERROR\nInvalid recipe: "..err, "text/plain" end
+		if not data.config then return "ERROR\nInvalid recipe: no config", "text/plain" end
+		for k,v in pairs( data.config ) do
+			luup.variable_set( MYSID, k, v, deviceNum )
+		end
+		return "OK\nRecipe " .. tostring(data.name) .. " loaded.\n"..recipe, "text/plain"
 
 	end
 
