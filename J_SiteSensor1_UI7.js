@@ -13,7 +13,7 @@
 
 var SiteSensor = (function(api, $) {
 
-	var pluginVersion = "1.15develop-20014";
+	var pluginVersion = "1.15develop-20015";
 
 	// unique identifier for this plugin...
 	var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
@@ -28,7 +28,8 @@ var SiteSensor = (function(api, $) {
 
 	/* Recipe variables. Exprn are handled separately. */
 	var recipeVars = [ "RequestURL", "Headers", "Interval", "Timeout", "QueryArmed",
-					   "ResponseType", "Trigger", "NumExp", "TripExpression" ];
+					   "ResponseType", "Trigger", "NumExp", "TripExpression", "ArmedInterval",
+					   "EvalInternal" ];
 
 	function updateResponseFields() {
 		var rtype = jQuery('select#rtype').val();
@@ -40,7 +41,7 @@ var SiteSensor = (function(api, $) {
 		var ttype = jQuery('select#trigger').val();
 		if ( ttype === undefined || ttype === null || jQuery('select#trigger option[value="' + ttype + '"]').attr('disabled') ) {
 			ttype = jQuery('select#trigger option:enabled').first().val();
-			jQuery('select#trigger').val(ttype); // causes loop/recursion?
+			jQuery('select#trigger').val(ttype).change(); /* causes recursion */
 		}
 
 		jQuery('input#pattern').attr('disabled', ttype != "match" && ttype != "neg");
@@ -174,7 +175,7 @@ var SiteSensor = (function(api, $) {
 			var s;
 			s = api.getDeviceState(myDevice, serviceId, "RequestURL");
 			jQuery("#requestURL").val(s ? s : "").change( function( obj ) {
-				var newUrl = jQuery(this).val();
+				var newUrl = jQuery(this).val().trim();
 				api.setDeviceStatePersistent(myDevice, serviceId, "RequestURL", newUrl, 0);
 			});
 
@@ -187,7 +188,7 @@ var SiteSensor = (function(api, $) {
 			jQuery("#requestHeaders").val(s ? s : "").change( function( obj ) {
 				var newText = jQuery(this).val();
 				// encode
-				newText = newText.replace(/\s+$/, ""); /* trim */
+				newText = newText.trim();
 				newText = newText.replace(/([|%])/g, function( m ) { return "%" + m.charCodeAt(0).toString(16); } ); /* escape our separator and escape */
 				newText = newText.replace(/\s*(\r|\n|\r\n)/g, "|"); /* Convert newlines to our list breaks */
 				api.setDeviceStatePersistent(myDevice, serviceId, "Headers", newText, 0);
@@ -197,7 +198,7 @@ var SiteSensor = (function(api, $) {
 			if (isNaN(s))
 				s = 1800;
 			jQuery("input#interval").val(s).change( function( obj ) {
-				var newInterval = jQuery(this).val();
+				var newInterval = jQuery(this).val().trim();
 				if (newInterval.match(/^[0-9]+$/) && newInterval > 0)
 					api.setDeviceStatePersistent(myDevice, serviceId, "Interval", newInterval, 0);
 			});
@@ -215,7 +216,7 @@ var SiteSensor = (function(api, $) {
 			if (isNaN(s))
 				s = 60;
 			jQuery("input#timeout").val(s).change( function( obj ) {
-				var newVal = jQuery(this).val();
+				var newVal = jQuery(this).val().trim();
 				if (newVal.match(/^[0-9]+$/) && newVal > 0) {
 					api.setDeviceStatePersistent(myDevice, serviceId, "Timeout", newVal, 0);
 				}
@@ -239,13 +240,13 @@ var SiteSensor = (function(api, $) {
 
 			s = api.getDeviceState(myDevice, serviceId, "Pattern");
 			jQuery("input#pattern").val(s ? s : "").change( function( obj ) {
-				var newPat = jQuery(this).val();
+				var newPat = jQuery(this).val().trim();
 				api.setDeviceStatePersistent(myDevice, serviceId, "Pattern", newPat, 0);
 			});
 
 			s = api.getDeviceState(myDevice, serviceId, "TripExpression");
 			jQuery("input#tripexpression").val(s ? s : "").change( function( obj ) {
-				var newExpr = jQuery(this).val();
+				var newExpr = jQuery(this).val().trim();
 				api.setDeviceStatePersistent(myDevice, serviceId, "TripExpression", newExpr, 0);
 			});
 
@@ -401,8 +402,8 @@ var SiteSensor = (function(api, $) {
 			if ( String( data.author || "" ).match( /^\s*$/ ) ) { throw "Field 'author' is required"; }
 			data.timestamp = Date.now();
 			var blk = btoa( recipe );
-			lines.push( "=== Ident: " + data.name + " version " + data.version + " by " + 
-				data.author + "; " + 
+			lines.push( "=== Ident: " + data.name + " version " + data.version + " by " +
+				data.author + "; " +
 				String(data.description||"").replace( /[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, "" ) );
 			lines.push( "=== BEGIN SITESENSOR RECIPE ===" );
 			while ( blk.length > 76 ) {
@@ -426,18 +427,25 @@ var SiteSensor = (function(api, $) {
 	}
 
 	function makeCurrentRecipe( myid ) {
+		var val;
 		var name = api.getDeviceAttribute( myid, "name" ) || myid;
 		var data = { "name":name, "author": "", version: "", description: "", config:{} };
 		data.version = Math.floor( Date.now() / 1000 );
 		var nvars = recipeVars.length;
 		for ( var ix=0; ix<recipeVars.length; ix++ ) {
-			data.config[recipeVars[ix]] = api.getDeviceState( myid, serviceId, recipeVars[ix] ) || "";
+			val = api.getDeviceState( myid, serviceId, recipeVars[ix] ) || "";
+			if ( !val.match( /^\s*$/ ) ) {
+				data.config[recipeVars[ix]] = val;
+			}
 		}
 		data.source = api.getDeviceState( myid, serviceId, "Version" ) || 0;
 		var numexp = parseInt( data.config.NumExp ) || 8;
 		for ( ix=1; ix<=numexp; ix++ ) {
 			var exname = "Expr" + ix;
-			data.config[exname] = api.getDeviceState( myid, serviceId, exname ) || "";
+			val = api.getDeviceState( myid, serviceId, exname ) || "";
+			if ( !val.match( /^\s*$/ ) ) {
+				data.config[exname] = val;
+			}
 		}
 		var recipe = JSON.stringify( data, null, 4 );
 		$( '#origdata' ).val( recipe );
