@@ -15,7 +15,7 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.15develop-20014"
+local _PLUGIN_VERSION = "1.15develop-20015"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 19288
 
@@ -216,6 +216,10 @@ local function setMessage(s, dev)
 	luup.variable_set(MYSID, "Message", s or "", dev or pluginDevice)
 end
 
+local function appendMessage(s, dev)
+	setMessage((luup.variable_get(MYSID, "Message", dev or pluginDevice))..(s or ""), dev)
+end
+
 local function isFailed(dev)
 	return getVarNumeric("Failed", 0, dev or pluginDevice, MYSID) ~= 0
 end
@@ -304,6 +308,7 @@ function scheduleNext(dev, delay, stamp)
 
 	-- Book it.
 	if delay < 1 then delay = 1 end
+	appendMessage( "; next at "..os.date("%X",os.time()+delay), dev)
 	L("Next activity in %1 seconds", delay)
 	luup.call_delay("siteSensorRunQuery", delay, string.format("%d:%d", stamp, dev))
 end
@@ -496,7 +501,7 @@ local function doMatchQuery( dev )
 
 	local method = "GET"
 	local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
-	local url = luup.variable_get(MYSID, "RequestURL", dev) or ""
+	local url = (luup.variable_get(MYSID, "RequestURL", dev) or ""):gsub( "^%s+", "" ):gsub( "%s+$", "" )
 	local pattern = luup.variable_get(MYSID, "Pattern", dev) or "^HTTP/1.. 200"
 	local timeout = getVarNumeric("Timeout", 30, dev)
 	local trigger = luup.variable_get(MYSID, "Trigger", dev) or nil
@@ -546,22 +551,23 @@ local function doMatchQuery( dev )
 			else
 				err = false
 				buf = buf .. chunk
-				local l = string.len(buf)
-				D("doMatchQuery() valid chunk, buf now contains %1", l)
-				local s, e, p = string.find(buf, pattern)
-				if s then
-					-- LastMatchValue will get the first capture if there is one, otherwise whatever matched
-					if p == nil then
-						matchValue = string.sub(buf, s, e)
-					else
-						matchValue = p
+				D("doMatchQuery() valid chunk, buf now contains %1", #buf)
+				if trigger ~= "err" then
+					local s, e, p = string.find(buf, pattern)
+					if s then
+						-- LastMatchValue will get the first capture if there is one, otherwise whatever matched
+						if p == nil then
+							matchValue = string.sub(buf, s, e)
+						else
+							matchValue = p
+						end
+						matched = true -- upvalue!
+						return nil, "Matched" -- early exit, fake valid response
 					end
-					matched = true -- upvalue!
-					return nil, "Matched" -- early exit, fake valid response
 				end
-				-- Reduce buffer to max 2048 bytes
-				if l > 2048 then
-					buf = string.sub(buf, l-2048+1)
+				-- Trim buffer to last 2048 bytes
+				if #buf > 2048 then
+					buf = string.sub(buf, #buf-2048+1)
 				end
 				return true
 			end
@@ -623,12 +629,12 @@ local function doMatchQuery( dev )
 	-- Set trip state based on result.
 	D("doMatchQuery() matched is %1", matched)
 	local newTrip
-	if trigger == "neg" then
-		newTrip = not matched
-	elseif trigger == "err" then
-		newTrip = err
-	else
+	if trigger == "match" then
 		newTrip = matched
+	elseif trigger == "neg" then
+		newTrip = not matched
+	else -- "err" is default now
+		newTrip = err
 	end
 	trip(newTrip, dev)
 
@@ -828,7 +834,7 @@ local function doEval( dev, ctx )
 	else
 		local msgExpr = luup.variable_get(MYSID, "MessageExpr", dev) or ""
 		if msgExpr == "" then
-			msg = "Last query succeeded!"
+			msg = "Last query OK"
 		else
 			msg = parseRefExpr(msgExpr, ctx, dev)
 			if msg == nil then msg = "?" end
@@ -1016,9 +1022,9 @@ function runQuery(p)
 	local stepStamp,dev
 
 	stepStamp,dev = string.match(p, "(%d+):(%d+)")
-	dev = tonumber(dev,10) or error "Invalid device number"
+	dev = tonumber(dev) or error "Invalid device number"
 
-	stepStamp = tonumber(stepStamp, 10)
+	stepStamp = tonumber(stepStamp)
 	if stepStamp ~= runStamp then
 		D("runQuery() stamp mismatch (got %1, expected %2). Newer thread running! I'm out...", stepStamp, runStamp)
 		return
@@ -1026,11 +1032,19 @@ function runQuery(p)
 
 	if not isEnabled( dev ) then
 		L("Query skipped; disabled.")
+		setMessage( "Disabled" )
+		return -- without rescheduling
+	end
+
+	if getVarNumeric( "QueryArmed", 1, dev ) ~= 0 and not isArmed( dev ) then
+		L("Query skipped; configured to query only when armed")
+		setMessage("Disarmed; query skipped.", dev)
+		luup.variable_set( SSSID, "Tripped", "0", dev )
+		runStamp = runStamp + 1
 		return -- without rescheduling
 	end
 
 	-- Are we doing an eval tick, or running a request?
-	local qtype = luup.variable_get(MYSID, "ResponseType", dev) or "text"
 	local timeNow = os.time()
 	luup.variable_set(MYSID, "LastRun", timeNow, dev)
 	local last = getVarNumeric( "LastQuery", 0, dev )
@@ -1038,28 +1052,16 @@ function runQuery(p)
 	if isArmed then
 		interval = getVarNumeric( "ArmedInterval", interval, dev )
 	end
+	local qtype = luup.variable_get(MYSID, "ResponseType", dev) or "text"
 	if timeNow >= ( last + interval ) then
+		-- Mark time, always, even if the query fails.
+		luup.variable_set(MYSID, "LastQuery", timeNow, dev)
 
-		-- We may only query when armed, so check that.
-		local queryArmed = getVarNumeric("QueryArmed", 1, dev) ~= 0
-		if isArmed(dev) or not queryArmed then
-
-			-- Mark time, always, even if the query fails.
-			luup.variable_set(MYSID, "LastQuery", timeNow, dev)
-
-			-- What type of query?
-			if qtype == "json" then
-				doJSONQuery(dev)
-			else
-				doMatchQuery(dev)
-			end
+		-- What type of query?
+		if qtype == "json" then
+			doJSONQuery(dev)
 		else
-			-- Disarmed and querying only when armed. No reschedule.
-			D("runQuery() disarmed, query disabled; not rescheduling.")
-			setMessage("Disarmed; query skipped.", dev)
-			luup.variable_set( SSSID, "Tripped", "0", dev )
-			runStamp = runStamp + 1
-			return
+			doMatchQuery(dev)
 		end
 	elseif qtype == "json" then
 		-- Not time, but for JSON we may do an eval if re-eval ticks are enabled.
@@ -1100,6 +1102,7 @@ function disarm(dev)
 	end
 	if getVarNumeric( "QueryArmed", 1, dev ) ~= 0 then
 		luup.variable_set(SSSID, "Tripped", "0", dev)
+		setMessage( "Disarmed; query skipped." )
 	end
 	-- Do not set ArmedTripped; Luup semantics
 end
@@ -1286,13 +1289,16 @@ function init(dev)
 	luup.chdev.sync( dev, ptr )
 
 	-- If sensor is query armed, and not armed, clear tripped explicitly.
-	if getVarNumeric( "QueryArmed", 1, dev ) ~= 0 and not isArmed( dev ) then
-		luup.variable_set( SSSID, "Tripped", "0", dev )
-	end
-
-	-- Schedule next query.
 	runStamp = 1
-	scheduleNext(dev, nil, runStamp)
+	if not isEnabled( dev ) then
+		luup.variable_set( SSSID, "Tripped", "0", dev )
+		setMessage( "Disabled" );
+	elseif getVarNumeric( "QueryArmed", 1, dev ) ~= 0 and not isArmed( dev ) then
+		luup.variable_set( SSSID, "Tripped", "0", dev )
+		setMessage( "Disarmed; query skipped." );
+	else
+		scheduleNext(dev, nil, runStamp)
+	end
 
 	luup.set_failure( 0, dev )
 	return true, "OK", _PLUGIN_NAME
@@ -1407,7 +1413,7 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
 			r = dfMap
 		end
 		return json.encode( r ), "application/json"
-		
+
 	elseif action == "recipe" then
 		local recipe = { name=luup.devices[deviceNum].description, version=os.time(), config={} }
 		recipe.signature = [["']]
@@ -1422,7 +1428,7 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
 		r = r .. json.encode(recipe, { indent=true })
 		r = r .. [[</pre><p>You can copy-paste the above, but be careful not to paste it into Word or other text editors or tools that would alter the quotes or content. A plain-text editor is the best tool. <b>Be sure to remove any auth keys or other private data before posting publicly!</b></p><h2>Load New Recipe</h2><form method="post" action="data_request"><input type="hidden" name="id" value="lr_SiteSensor"><input type="hidden" name="action" value="loadrecipe"><input type="hidden" name="device" value="]] .. deviceNum .. [["><label>Recipe:<textarea name="rdata" wrap="soft" rows="4" cols="80"></textarea></label><br/>Loading the recipe will overwrite this SiteSensor's current configuration. OK/ready? <input type="submit" name="submit" value="Load Recipe"></form>]]
 		return r, "text/html"
-		
+
 	elseif action == "loadrecipe" then
 		local recipe = lul_parameters.rdata or ""
 		local pos,ends = recipe:find( "=== BEGIN SITESENSOR RECIPE ===%s+" )
