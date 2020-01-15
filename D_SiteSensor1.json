@@ -55,7 +55,7 @@
 				"top": 0,
 				"left": 1,
 				"x": 2,
-				"y": 1
+				"y": 4
 			}],
 			"Control": [{
 					"ControlGroup": 1,
@@ -186,7 +186,7 @@
 				},
 				{
 					"ControlType": "label",
-					"top": 0,
+					"top": 1,
 					"left": 0,
 					"HorizontalMultiplier": 0.25,
 					"Display": {
@@ -202,7 +202,7 @@
 				},
 				{
 					"ControlType": "variable",
-					"top": 0,
+					"top": 1,
 					"left": 0,
 					"HorizontalMultiplier": 1.75,
 					"Display": {
@@ -216,7 +216,7 @@
 				},
 				{
 					"ControlType": "label",
-					"top": 0,
+					"top": 1,
 					"left": 0,
 					"HorizontalMultiplier": 0.25,
 					"Display": {
@@ -232,7 +232,7 @@
 				},
 				{
 					"ControlType": "variable",
-					"top": 0,
+					"top": 1,
 					"left": 0,
 					"HorizontalMultiplier": 1.75,
 					"Display": {
@@ -246,7 +246,7 @@
 				},
 				{
 					"ControlType": "label",
-					"top": 0,
+					"top": 2,
 					"left": 0,
 					"HorizontalMultiplier": 0.25,
 					"Display": {
@@ -262,7 +262,7 @@
 				},
 				{
 					"ControlType": "variable",
-					"top": 0,
+					"top": 2,
 					"left": 0,
 					"HorizontalMultiplier": 1.75,
 					"Display": {
@@ -276,7 +276,7 @@
 				},
 				{
 					"ControlType": "label",
-					"top": 0,
+					"top": 2,
 					"left": 0,
 					"HorizontalMultiplier": 0.25,
 					"Display": {
@@ -292,7 +292,7 @@
 				},
 				{
 					"ControlType": "variable",
-					"top": 0,
+					"top": 2,
 					"left": 0,
 					"HorizontalMultiplier": 1.75,
 					"Display": {
@@ -306,7 +306,7 @@
 				},
 				{
 					"ControlType": "label",
-					"top": 0,
+					"top": 3,
 					"left": 0,
 					"HorizontalMultiplier": 0.25,
 					"Display": {
@@ -322,7 +322,7 @@
 				},
 				{
 					"ControlType": "variable",
-					"top": 0,
+					"top": 3,
 					"left": 0,
 					"HorizontalMultiplier": 1.75,
 					"Display": {
@@ -336,7 +336,7 @@
 				},
 				{
 					"ControlType": "label",
-					"top": 0,
+					"top": 3,
 					"left": 0,
 					"HorizontalMultiplier": 0.25,
 					"Display": {
@@ -352,7 +352,7 @@
 				},
 				{
 					"ControlType": "variable",
-					"top": 0,
+					"top": 3,
 					"left": 0,
 					"HorizontalMultiplier": 1.75,
 					"Display": {
@@ -366,7 +366,7 @@
 				},
 				{
 					"ControlType": "label",
-					"top": 0,
+					"top": 4,
 					"left": 0,
 					"HorizontalMultiplier": 0.25,
 					"Display": {
@@ -382,7 +382,7 @@
 				},
 				{
 					"ControlType": "variable",
-					"top": 0,
+					"top": 4,
 					"left": 0,
 					"HorizontalMultiplier": 1.75,
 					"Display": {
@@ -396,7 +396,7 @@
 				},
 				{
 					"ControlType": "label",
-					"top": 0,
+					"top": 4,
 					"left": 0,
 					"HorizontalMultiplier": 0.25,
 					"Display": {
@@ -412,7 +412,7 @@
 				},
 				{
 					"ControlType": "variable",
-					"top": 0,
+					"top": 4,
 					"left": 0,
 					"HorizontalMultiplier": 1.75,
 					"Display": {
@@ -426,7 +426,7 @@
 				},
 				{
 					"ControlType": "label",
-					"top": 0,
+					"top": 6,
 					"left": 0,
 					"HorizontalMultiplier": 4,
 					"Display": {
@@ -437,12 +437,12 @@
 					},
 					"Label": {
 						"lang_tag": "tb_sitesensor_about",
-						"text": "SiteSensor ver 1.15develop-20014 &#169; 2017,2018 Patrick H. Rigney, All Rights Reserved. For documentation and license information, go to <a target='_blank' href='http://www.toggledbits.com/sitesensor'>http://www.toggledbits.com/sitesensor</a>. Use of this plugin constitutes acceptance of and agreement to the license terms without limitation or exclusion."
+						"text": "SiteSensor ver 1.15develop-20015 &#169; 2017,2018 Patrick H. Rigney, All Rights Reserved. For documentation and license information, go to <a target='_blank' href='http://www.toggledbits.com/sitesensor'>http://www.toggledbits.com/sitesensor</a>. Use of this plugin constitutes acceptance of and agreement to the license terms without limitation or exclusion."
 					}
 				},
 				{
 					"ControlType": "label",
-					"top": 0,
+					"top": 8,
 					"left": 0,
 					"Label": {
 						"lang_tag": "tb_sitesensor_donate",
