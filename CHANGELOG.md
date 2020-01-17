@@ -4,6 +4,8 @@
 
 * Fix: Make sure dkjson decodes "null" to LuaXP's *null* value rather than Lua `nil`.
 * Fix: Some versions of Luasec require the SSL protocol to be set, they don't default, so use "tlsv1" as a default for all.
+* Enhancement: Force default room for child device to same room as parent at initialization (can be moved after).
+* Enhancement: When a new child is created, copy the current value of the expression to the newly-initialized child.
 * Enhancement: Load and create recipes. A recipe is a saved/packaged configuration that can be deployed easily.
 * Enhancement: Add `SetEnabled` action (parameter `newEnabledValue`) to set enable/disable state of a SiteSensor. When disabled, queries are not run. This provides an alternate mechanism to the arm/disarm control to control queries without Luup notifications that accompany security sensor arming state. Requested by whyfseeguy.
 

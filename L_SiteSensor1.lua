@@ -15,7 +15,7 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.15develop-20015"
+local _PLUGIN_VERSION = "1.15develop-20017"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 19288
 
@@ -308,7 +308,7 @@ function scheduleNext(dev, delay, stamp)
 
 	-- Book it.
 	if delay < 1 then delay = 1 end
-	appendMessage( "; next at "..os.date("%X",os.time()+delay), dev)
+	-- appendMessage( "; next at "..os.date("%X",os.time()+delay), dev)
 	L("Next activity in %1 seconds", delay)
 	luup.call_delay("siteSensorRunQuery", delay, string.format("%d:%d", stamp, dev))
 end
@@ -787,6 +787,8 @@ local function doEval( dev, ctx )
 							rv = r ~= nil
 						end
 						D("doEval() converting %1(%2) to sensor boolean value %3", r, type(r), rv)
+					elseif type(r) == "table" then
+						rv = table.concat( r, ", " )
 					else
 						rv = tostring(r)
 					end
@@ -1232,7 +1234,7 @@ function init(dev)
 	for ix=1,numchild do
 		local childid = string.format( "ch%d", ix )
 		local childtype = luup.variable_get( MYSID, "Child" .. tostring(ix), dev ) or ""
-		D("init() child id %1 type %2", childid, childtype)
+		D("init() child id %1 should be type %2", childid, childtype)
 		if childtype ~= "" then
 			-- We should have a child.
 			local devnum = myChildren[ childid ]
@@ -1244,15 +1246,20 @@ function init(dev)
 					-- Yes. Append (existing)
 					local df = dfMap[ v.device_type ]
 					if df then
-						luup.chdev.append( dev, ptr, v.id, v.description, "", df.device_file, "", "", false )
+						luup.chdev.append( dev, ptr, v.id, v.description, v.device_type,
+							luup.attr_get( 'device_file', devnum ) or "", "", "", false )
 						local s = getVarNumeric( "Version", 0, devnum, MYSID )
 						if s == 0 then
 							-- First-time init for child
 							L("Performing first-time inits for %1", childid)
 							luup.attr_set( "category_num", df.category, devnum )
 							luup.attr_set( "subcategory_num", df.subcategory or 0, devnum )
+							luup.attr_set( "room", luup.devices[dev].room_num or 0, devnum )
 							luup.variable_set( MYSID, "Version", _CONFIGVERSION, devnum )
 						end
+						-- Copy current value to child for display
+						local cv = luup.variable_get( MYSID, "Value"..tostring(ix), dev ) or ""
+						luup.variable_set( df.service, df.variable, cv, devnum )
 					else
 						L({level=1,msg="Missing dfMap entry for %1; child for expr %2 will be removed."}, v.device_type, ix)
 						changed = true
@@ -1268,6 +1275,9 @@ function init(dev)
 				if df then
 					local desc = " " .. tostring(ix)
 					desc = luup.attr_get( "name", dev ):sub(1, 20-#desc) .. desc
+					local vv = { ",room=" .. ( luup.devices[dev].room_num or 0 ) }
+					if df.category then table.insert( vv, ",category_num=" .. df.category ) end
+					if df.subcategory then table.insert( vv, ",subcategory_num=" .. df.subcategory ) end
 					luup.chdev.append( dev, ptr, childid, desc, "", df.device_file, "", "", false )
 					L("Creating new child device for expr %1; this will cause a Luup reload.", ix)
 					changed = true
