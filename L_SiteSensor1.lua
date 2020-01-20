@@ -195,6 +195,31 @@ local function parseRefExpr(ex, ctx, dev)
 	return val
 end
 
+local function initVar( sid, name, dflt, dev )
+	dev = dev or pluginDevice
+	sid = sid or MYSID
+	local currVal = luup.variable_get( sid, name, dev )
+	if currVal == nil then
+		luup.variable_set( sid, name, tostring(dflt), dev )
+		return dflt
+	end
+	return currVal
+end
+
+-- Set variable, only if value has changed.
+local function setVar( sid, name, val, dev )
+	assert( dev ~= nil and type(dev) == "number", "Invalid set device for "..dump({sid=sid,name=name,val=val,dev=dev}) )
+	assert( dev > 0, "Invalid device number "..tostring(dev) )
+	assert( sid ~= nil, "SID required for "..tostring(name) )
+	val = (val == nil) and "" or tostring(val)
+	local s = luup.variable_get( sid, name, dev )
+	-- D("setVar(%1,%2,%3,%4) old value %5", sid, name, val, dev, s )
+	if s ~= val then
+		luup.variable_set( sid, name, val, dev )
+	end
+	return s
+end
+
 local function getVar( name, dflt, dev, serviceId )
 	local s = luup.variable_get(serviceId or MYSID, name, dev or pluginDevice) or ""
 	return ( not string.match( s, "^%s*$" ) ) and s or dflt -- this specific test allows nil dflt return
@@ -213,7 +238,7 @@ local function isEnabled( dev )
 end
 
 local function setMessage(s, dev)
-	luup.variable_set(MYSID, "Message", s or "", dev or pluginDevice)
+	setVar(MYSID, "Message", s or "", dev or pluginDevice)
 end
 
 local function appendMessage(s, dev)
@@ -229,7 +254,7 @@ local function fail(failState, dev)
 	D("fail(%1,%2)", failState, dev)
 	if failState ~= isFailed(dev) then
 		local fval = failState and 1 or 0
-		luup.variable_set(MYSID, "Failed", fval, dev or pluginDevice)
+		setVar(MYSID, "Failed", fval, dev or pluginDevice)
 	end
 	if getVarNumeric( "DeviceErrorOnFailure", 1, dev, SSSID ) ~= 0 then
 		luup.set_failure( failState and 1 or 0, dev or pluginDevice )
@@ -261,7 +286,7 @@ local function trip(tripped, dev)
 			D("trip() marking not tripped")
 			newVal = "0"
 		end
-		luup.variable_set(SSSID, "Tripped", newVal, dev)
+		setVar(SSSID, "Tripped", newVal, dev)
 		-- LastTrip and ArmedTripped are set as needed by Luup
 	end
 end
@@ -612,7 +637,7 @@ local function doMatchQuery( dev )
 			C(dev, "Request failed: %1", httpStatus or "connection failure")
 		end
 		setMessage("Request error: " .. ( httpStatus or "connection failure" ), dev)
-		luup.variable_set(MYSID, "LastMatchValue", "", dev)
+		setVar(MYSID, "LastMatchValue", "", dev)
 		fail(true, dev)
 	else
 		if logRequest then
@@ -621,7 +646,7 @@ local function doMatchQuery( dev )
 		setMessage( "Valid response; " .. ( matched and "matched!" or "no match." ), dev )
 		local lastVal = luup.variable_get(MYSID, "LastMatchValue", dev)
 		if lastVal == nil or lastVal ~= matchValue then
-			luup.variable_set(MYSID, "LastMatchValue", matchValue, dev)
+			setVar(MYSID, "LastMatchValue", matchValue, dev)
 		end
 		fail(false, dev)
 	end
@@ -642,7 +667,7 @@ local function doMatchQuery( dev )
 	luup.variable_set( MYSID, "LastResponse", "", dev )
 	local numexp = getVarNumeric( "NumExp", 8, dev, MYSID )
 	for k=1,numexp do
-		luup.variable_set(MYSID, "Value" .. tostring(k), "", dev)
+		setVar(MYSID, "Value" .. tostring(k), "", dev)
 	end
 end
 
@@ -746,7 +771,7 @@ local function doEval( dev, ctx )
 				numErrors = numErrors + 1
 			end
 		else
-			luup.variable_set(MYSID, "Expr" .. tostring(i), "", dev)
+			setVar(MYSID, "Expr" .. tostring(i), "", dev)
 		end
 
 		-- Canonify the result value
@@ -770,7 +795,7 @@ local function doEval( dev, ctx )
 		if rv ~= oldVal or debugMode then
 			-- Set new value only if changed
 			D("doEval() Expr%1 value changed, was %2 now %3", i, oldVal, rv)
-			luup.variable_set(MYSID, "Value" .. tostring(i), rv, dev)
+			setVar(MYSID, "Value" .. tostring(i), rv, dev)
 
 			-- Save to child if exists.
 			local dv = findChild( string.format( "ch%d", i ) )
@@ -794,7 +819,7 @@ local function doEval( dev, ctx )
 					end
 					D("doEval() converted %1(%2) to sensor %4 value %3", r, type(r), rv, df.datatype)
 					D("doEval() setting child %1 (#%2) %3/%4=%5", i, dv, df.service, df.variable, rv)
-					luup.variable_set( df.service or MYSID, df.variable or "CurrentLevel", rv, dv )
+					setVar( df.service or MYSID, df.variable or "CurrentLevel", rv, dv )
 				else
 					L({level=2,msg="Can't store value for expr %1 to child, no dfMap entry for %2"}, i, luup.devices[dv].device_type)
 				end
@@ -929,89 +954,45 @@ local function runOnce(dev)
 	assert(dev ~= nil)
 	local rev = getVarNumeric("Version", 0, dev)
 	if rev == 0 then
-		-- Initialize for new installation
+		-- Initialize for new instance
 		D("runOnce() Performing first-time initialization!")
-		luup.variable_set(MYSID, "Enabled", 1, dev)
-		luup.variable_set(MYSID, "DebugMode", 0, dev)
-		luup.variable_set(MYSID, "Message", "", dev)
-		luup.variable_set(MYSID, "RequestURL", "", dev)
-		luup.variable_set(MYSID, "Interval", "1800", dev)
-		luup.variable_set(MYSID, "Timeout", "30", dev)
-		luup.variable_set(MYSID, "QueryArmed", "1", dev)
-		luup.variable_set(MYSID, "ResponseType", "text", dev)
-		luup.variable_set(MYSID, "Trigger", "err", dev)
-		luup.variable_set(MYSID, "Failed", "1", dev)
-		luup.variable_set(MYSID, "LastQuery", "0", dev)
-		luup.variable_set(MYSID, "LastRun", "0", dev)
-		luup.variable_set(MYSID, "LogRequests", "0", dev)
-		luup.variable_set(MYSID, "EvalInterval", "", dev)
-		luup.variable_set(MYSID, "SSLVerify", "", dev)
-		luup.variable_set(MYSID, "SSLProtocol", "", dev)
-		luup.variable_set(MYSID, "SSLOptions", "", dev)
-		luup.variable_set(MYSID, "UseCurl", "0", dev)
-		luup.variable_set(MYSID, "CurlOptions", "", dev)
-		luup.variable_set(MYSID, "CAFile", "", dev)
-		luup.variable_set( MYSID, "DeviceErrorOnFailure", 1, dev )
-
-		luup.variable_set(SSSID, "Armed", "0", dev)
-		luup.variable_set(SSSID, "Tripped", "0", dev)
-		luup.variable_set(SSSID, "AutoUntrip", "0", dev)
-
-		luup.variable_set(HASID, "ModeSetting", "1:;2:;3:;4:", dev )
 
 		luup.attr_set( "category_num", 4, dev )
 		luup.attr_set( "subcategory_num", 0, dev )
-
-		luup.variable_set(MYSID, "Version", _CONFIGVERSION, dev)
-		return
 	end
 
-	if rev < 10400 then
-		D("runOnce() Upgrading config to 10400")
-		luup.variable_set(MYSID, "EvalInterval", "", dev)
-		luup.variable_set(HASID, "ModeSetting", "1:;2:;3:;4:", dev )
-	end
+	initVar(MYSID, "Enabled", 1, dev)
+	initVar(MYSID, "NumExp", 8, dev)
+	initVar(MYSID, "DebugMode", 0, dev)
+	initVar(MYSID, "Message", "", dev)
+	initVar(MYSID, "RequestURL", "", dev)
+	initVar(MYSID, "Interval", "1800", dev)
+	initVar(MYSID, "Timeout", "30", dev)
+	initVar(MYSID, "QueryArmed", "1", dev)
+	initVar(MYSID, "ResponseType", "text", dev)
+	initVar(MYSID, "Trigger", "err", dev)
+	initVar(MYSID, "Failed", "1", dev)
+	initVar(MYSID, "LastQuery", "0", dev)
+	initVar(MYSID, "LastRun", "0", dev)
+	initVar(MYSID, "LogRequests", "0", dev)
+	initVar(MYSID, "EvalInterval", "", dev)
+	initVar(MYSID, "MessageExpr", "", dev)
+	initVar(MYSID, "SSLVerify", "", dev)
+	initVar(MYSID, "SSLProtocol", "", dev)
+	initVar(MYSID, "SSLOptions", "", dev)
+	initVar(MYSID, "UseCurl", "0", dev)
+	initVar(MYSID, "CurlOptions", "", dev)
+	initVar(MYSID, "CAFile", "", dev)
+	initVar( MYSID, "DeviceErrorOnFailure", 1, dev )
 
-	if rev < 10700 then
-		D("runOnce() Upgrading config to 10700")
-		luup.variable_set(SSSID, "AutoUntrip", "0", dev)
-	end
+	initVar(SSSID, "Armed", "0", dev)
+	initVar(SSSID, "Tripped", "0", dev)
+	initVar(SSSID, "AutoUntrip", "0", dev)
 
-	if rev < 10701 then
-		D("runOnce() Upgrading config to 10701")
-		luup.variable_set(MYSID, "MessageExpr", "", dev)
-	end
-
-	if rev < 10900 then
-		D("runOnce() Upgrading config to 10900")
-		luup.attr_set( "category_num", 4, dev )
-		luup.attr_set( "subcategory_num", 0, dev )
-	end
-
-	if rev < 11000 then
-		luup.variable_set( MYSID, "DebugMode", 0, dev )
-		luup.variable_set( MYSID, "NumExp", 8, dev )
-		luup.variable_set(MYSID, "SSLVerify", "", dev)
-		luup.variable_set(MYSID, "SSLProtocol", "", dev)
-		luup.variable_set(MYSID, "SSLOptions", "", dev)
-		luup.variable_set(MYSID, "CAFile", "", dev)
-	end
-
-	if rev < 19085 then
-		luup.variable_set( MYSID, "DeviceErrorOnFailure", 1, dev )
-	end
-
-	if rev < 19103 then
-		luup.variable_set(MYSID, "UseCurl", "0", dev)
-		luup.variable_set(MYSID, "CurlOptions", "", dev)
-	end
-
-	if rev < 19288 then
-		luup.variable_set(MYSID, "Enabled", "1", dev)
-	end
+	initVar(HASID, "ModeSetting", "1:;2:;3:;4:", dev )
 
 	-- No matter what happens above, if our versions don't match, force that here/now.
-	if (rev ~= _CONFIGVERSION) then
+	if rev < _CONFIGVERSION then
 		luup.variable_set(MYSID, "Version", _CONFIGVERSION, dev)
 	end
 end
@@ -1041,7 +1022,7 @@ function runQuery(p)
 	if getVarNumeric( "QueryArmed", 1, dev ) ~= 0 and not isArmed( dev ) then
 		L("Query skipped; configured to query only when armed")
 		setMessage("Disarmed; query skipped.", dev)
-		luup.variable_set( SSSID, "Tripped", "0", dev )
+		setVar( SSSID, "Tripped", "0", dev )
 		runStamp = runStamp + 1
 		return -- without rescheduling
 	end
@@ -1090,7 +1071,7 @@ function arm(dev)
 	D("arm(%1) arming!", dev)
 	assert(dev ~= nil)
 	if not isArmed(dev) then
-		luup.variable_set(SSSID, "Armed", "1", dev)
+		setVar(SSSID, "Armed", "1", dev)
 		-- Do not set ArmedTripped; Luup semantics
 		forceUpdate(dev)
 	end
@@ -1100,10 +1081,10 @@ function disarm(dev)
 	D("disarm(%1) disarming!", dev)
 	assert(dev ~= nil)
 	if isArmed(dev) then
-		luup.variable_set(SSSID, "Armed", "0", dev)
+		setVar(SSSID, "Armed", "0", dev)
 	end
 	if getVarNumeric( "QueryArmed", 1, dev ) ~= 0 then
-		luup.variable_set(SSSID, "Tripped", "0", dev)
+		setVar(SSSID, "Tripped", "0", dev)
 		setMessage( "Disarmed; query skipped." )
 	end
 	-- Do not set ArmedTripped; Luup semantics
@@ -1112,10 +1093,10 @@ end
 function requestLogging( dev, enabled )
 	D("requestLogging(%1,%2)", dev, enabled )
 	if enabled then
-		luup.variable_set( MYSID, "LogRequests", "1", dev )
+		setVar( MYSID, "LogRequests", "1", dev )
 		L("Request logging enabled. Detailed logging will begin at next request/eval.")
 	else
-		luup.variable_set( MYSID, "LogRequests", "0", dev )
+		setVar( MYSID, "LogRequests", "0", dev )
 	end
 end
 
@@ -1259,7 +1240,7 @@ function init(dev)
 						end
 						-- Copy current value to child for display
 						local cv = luup.variable_get( MYSID, "Value"..tostring(ix), dev ) or ""
-						luup.variable_set( df.service, df.variable, cv, devnum )
+						setVar( df.service, df.variable, cv, devnum )
 					else
 						L({level=1,msg="Missing dfMap entry for %1; child for expr %2 will be removed."}, v.device_type, ix)
 						changed = true
@@ -1301,10 +1282,10 @@ function init(dev)
 	-- If sensor is query armed, and not armed, clear tripped explicitly.
 	runStamp = 1
 	if not isEnabled( dev ) then
-		luup.variable_set( SSSID, "Tripped", "0", dev )
+		setVar( SSSID, "Tripped", "0", dev )
 		setMessage( "Disabled" );
 	elseif getVarNumeric( "QueryArmed", 1, dev ) ~= 0 and not isArmed( dev ) then
-		luup.variable_set( SSSID, "Tripped", "0", dev )
+		setVar( SSSID, "Tripped", "0", dev )
 		setMessage( "Disarmed; query skipped." );
 	else
 		scheduleNext(dev, nil, runStamp)
