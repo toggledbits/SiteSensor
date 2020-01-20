@@ -25,6 +25,7 @@ var SiteSensor = (function(api, $) {
 	var isVisible = false;
 	var isOpenLuup = false;
 	// var isALTUI = false;
+	var needsReload = false;
 
 	/* Recipe variables. Exprn are handled separately. */
 	var recipeVars = [ "RequestURL", "Headers", "Interval", "Timeout", "QueryArmed",
@@ -54,6 +55,11 @@ var SiteSensor = (function(api, $) {
 	function onBeforeCpanelClose(args) {
 		// console.log('handler for before cpanel close');
 		isVisible = false;
+		if ( needsReload && confirm( "Since you changed device type configuration, Luup needs to be reloaded for those changes to take effect. Click 'OK' to reload now, or 'Cancel' to do it yourself later.") ) {
+			api.performActionOnDevice( 0, "urn:micasaverde-com:serviceId:HomeAutomationGateway1", "Reload",
+				{ actionArguments: { Reason: "SiteSensor device changes require reload" } } );
+		}
+		needReload = false;
 	}
 
 	function initPlugin() {
@@ -64,6 +70,8 @@ var SiteSensor = (function(api, $) {
 				break;
 			}
 		}
+
+		needsReload = false;
 	}
 
 	function configurePlugin()
@@ -290,6 +298,7 @@ var SiteSensor = (function(api, $) {
 					var el = jQuery( ev.currentTarget );
 					var id = el.attr( 'id' ).substr( 5 );
 					api.setDeviceStatePersistent( api.getCpanelDeviceId(), serviceId, "Child" + id, el.val() || "" );
+					needsReload = true;
 				});
 				jQuery( 'input.jsonexpr' ).each( function( obj ) {
 					var ix = jQuery( this ).attr('id').substr(4);
