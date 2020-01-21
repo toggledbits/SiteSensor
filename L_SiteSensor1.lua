@@ -956,7 +956,7 @@ local function runOnce(dev)
 	if rev == 0 then
 		-- Initialize for new instance
 		D("runOnce() Performing first-time initialization!")
-
+		setVar(HASID, "ModeSetting", "1:;2:;3:;4:", dev )
 		luup.attr_set( "category_num", 4, dev )
 		luup.attr_set( "subcategory_num", 0, dev )
 	end
@@ -988,8 +988,6 @@ local function runOnce(dev)
 	initVar(SSSID, "Armed", "0", dev)
 	initVar(SSSID, "Tripped", "0", dev)
 	initVar(SSSID, "AutoUntrip", "0", dev)
-
-	initVar(HASID, "ModeSetting", "1:;2:;3:;4:", dev )
 
 	-- No matter what happens above, if our versions don't match, force that here/now.
 	if rev < _CONFIGVERSION then
