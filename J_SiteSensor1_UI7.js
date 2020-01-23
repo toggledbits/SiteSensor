@@ -13,7 +13,7 @@
 
 var SiteSensor = (function(api, $) {
 
-	var pluginVersion = "1.15develop-20017";
+	var pluginVersion = "1.15";
 
 	// unique identifier for this plugin...
 	var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
