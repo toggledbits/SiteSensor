@@ -32,8 +32,9 @@ local myChildren
 local logCapture = {}
 local logMax = 50
 
-local https = require("ssl.https")
 local http = require("socket.http")
+local ssl = require "ssl"
+local https = require("ssl.https")
 local ltn12 = require("ltn12")
 local json = require('dkjson')
 local luaxp = require("L_LuaXP")
@@ -473,7 +474,8 @@ local function doRequest(url, method, body, dev)
 		if url:lower():find("https:") then
 			requestor = https
 			req.verify = getVar( "SSLVerify", "none", dev, MYSID )
-			req.protocol = getVar( "SSLProtocol", "tlsv1", dev, MYSID )
+			req.protocol = getVar( "SSLProtocol", ( ssl._VERSION or "0.5" ):match("^0%.5") and "tlsv1" or "any", dev, MYSID )
+			req.mode = getVar( "SSLMode", "client", dev, MYSID )
 			local s = split( getVar( "SSLOptions", nil, dev, MYSID ) or "" )
 			if #s > 0 then req.options = s end
 			req.cafile = getVar( "CAFile", nil, dev, MYSID )
@@ -604,8 +606,10 @@ local function doMatchQuery( dev )
 	if url:lower():find("^https:") then
 		requestor = https
 		req.verify = getVar( "SSLVerify", "none", dev, MYSID )
-		req.protocol = getVar( "SSLProtocol", "tlsv1", dev, MYSID )
-		req.options = getVar( "SSLOptions", nil, dev, MYSID )
+		req.protocol = getVar( "SSLProtocol", ( ssl._VERSION or "0.5" ):match("^0%.5") and "tlsv1" or "any", dev, MYSID )
+		req.mode = getVar( "SSLMode", "client", dev, MYSID )
+		local s = split( getVar( "SSLOptions", nil, dev, MYSID ) or "" )
+		if #s > 0 then req.options = s end
 		req.cafile = getVar( "CAFile", nil, dev, MYSID )
 		C(dev, "Set up for HTTPS request, verify=%1, protocol=%2, options=%3",
 			req.verify, req.protocol, req.options)

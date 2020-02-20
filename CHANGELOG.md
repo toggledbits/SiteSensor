@@ -3,7 +3,7 @@
 ## Version 1.15 (development)
 
 * Fix: Make sure dkjson decodes "null" to LuaXP's *null* value rather than Lua `nil`.
-* Fix: Some versions of Luasec require the SSL protocol to be set, they don't default, so use "tlsv1" as a default for all.
+* Fix: Some versions of Luasec require the SSL protocol to be set, they don't default, so use "all" for LuaSec > 0.5 (7.31 firmware except Edge), and "tlsv1" for 0.5.
 * Enhancement: Force default room for child device to same room as parent at initialization (can be moved after).
 * Enhancement: When a new child is created, copy the current value of the expression to the newly-initialized child.
 * Enhancement: Load and create recipes. A recipe is a saved/packaged configuration that can be deployed easily.
