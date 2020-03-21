@@ -454,6 +454,12 @@ var SiteSensor = (function(api, $) {
 			val = api.getDeviceState( myid, serviceId, exname ) || "";
 			if ( !val.match( /^\s*$/ ) ) {
 				data.config[exname] = val;
+
+				exname = "Child" + ix;
+				val = api.getDeviceState( myid, serviceId, exname ) || "";
+				if ( !val.match( /^\s*$/ ) ) {
+					data.config[exname] = val;
+				}
 			}
 		}
 		var recipe = JSON.stringify( data, null, 4 );
