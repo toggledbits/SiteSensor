@@ -1009,7 +1009,7 @@ local function runOnce(dev)
 	initVar(MYSID, "CurlOptions", "", dev)
 	initVar(MYSID, "CAFile", "", dev)
 	initVar( MYSID, "DeviceErrorOnFailure", 1, dev )
-	initVar( MYSID, "MaxResponseSize", 1, dev )
+	initVar( MYSID, "MaxResponseSize", "", dev )
 
 	initVar(SSSID, "Armed", "0", dev)
 	initVar(SSSID, "Tripped", "0", dev)
