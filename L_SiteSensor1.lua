@@ -399,6 +399,24 @@ local function substitution( str, enc, dev )
 	return str
 end
 
+-- Returns a LTN12 filter that stops sending data after limit bytes
+local function getcountfilter( limit )
+	local count = 0
+	return function( chunk )
+		if chunk == nil then
+			return nil
+		elseif chunk == "" then
+			return ""
+		else
+			local rem = limit - count
+			if rem <= 0 then return "" end
+			if rem > #chunk then rem = #chunk end
+			count = count + rem
+			return chunk:sub(1, rem)
+		end
+	end
+end
+
 local function doRequest(url, method, body, dev)
 	assert(dev ~= nil)
 	local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
@@ -460,10 +478,12 @@ local function doRequest(url, method, body, dev)
 	else
 		-- Set up the request table
 		local r = {}
+		local rsink = ltn12.sink.table( r )
+		local counter = getcountfilter( 128072 )
 		local req = {
 			url = url,
 			source = src,
-			sink = ltn12.sink.table(r),
+			sink = ltn12.sink.chain( counter, rsink ),
 			method = method,
 			headers = tHeaders,
 			redirect = false
@@ -474,7 +494,7 @@ local function doRequest(url, method, body, dev)
 		if url:lower():find("https:") then
 			requestor = https
 			req.verify = getVar( "SSLVerify", "none", dev, MYSID )
-			req.protocol = getVar( "SSLProtocol", ( ssl._VERSION or "0.5" ):match("^0%.5") and "tlsv1" or "any", dev, MYSID )
+			req.protocol = getVar( "SSLProtocol", ( ssl._VERSION or "0.5" ):find("^0%.5") and "tlsv1" or "any", dev, MYSID )
 			req.mode = getVar( "SSLMode", "client", dev, MYSID )
 			local s = split( getVar( "SSLOptions", nil, dev, MYSID ) or "" )
 			if #s > 0 then req.options = s end
