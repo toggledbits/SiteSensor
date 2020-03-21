@@ -1,6 +1,11 @@
 # CHANGELOG #
 
-## Version 1.15 (development)
+## Version 1.16 (development)
+
+* Enhancement: Actively limit response size by discard data over `MaxResponseSize` bytes (default 65536). This prevents a massive response from the server from overrunning and crashing the Vera.
+* Enhancement: Recipes! You can now save your SiteSensor configuration as a portable recipe, and load recipes you've saved or gotten from others.
+
+## Version 1.15 (released)
 
 * Fix: Make sure dkjson decodes "null" to LuaXP's *null* value rather than Lua `nil`.
 * Fix: Some versions of Luasec require the SSL protocol to be set, they don't default, so use "all" for LuaSec > 0.5 (7.31 firmware except Edge), and "tlsv1" for 0.5.
