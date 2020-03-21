@@ -8,7 +8,7 @@
 -- Github: https://github.com/toggledbits/luaxp
 ------------------------------------------------------------------------
 
-module("L_LuaXP_Reactor", package.seeall)
+module("L_LuaXP", package.seeall)
 
 _VERSION = "1.0.2"
 _VNUMBER = 10002
