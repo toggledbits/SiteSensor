@@ -17,7 +17,7 @@ local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
 local _PLUGIN_VERSION = "1.16develop-20081"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
-local _CONFIGVERSION = 19288
+local _CONFIGVERSION = 20081
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local MYTYPE = "urn:schemas-toggledbits-com:device:SiteSensor:1"
@@ -424,7 +424,6 @@ local function doRequest(url, method, body, dev)
 
 	-- A few other knobs we can turn
 	local timeout = getVarNumeric("Timeout", 30, dev) -- ???
-	-- local maxlength = getVarNumeric("MaxLength", 262144, dev) -- ???
 
 	local src
 	local tHeaders = {}
@@ -479,7 +478,9 @@ local function doRequest(url, method, body, dev)
 		-- Set up the request table
 		local r = {}
 		local rsink = ltn12.sink.table( r )
-		local counter = getcountfilter( 128072 )
+		local maxresp = getVarNumeric( "MaxResponseSize", 65536, dev, MYSID )
+		D("doRequest() setting up for max response length %1", maxresp)
+		local counter = getcountfilter( maxresp )
 		local req = {
 			url = url,
 			source = src,
@@ -494,7 +495,7 @@ local function doRequest(url, method, body, dev)
 		if url:lower():find("https:") then
 			requestor = https
 			req.verify = getVar( "SSLVerify", "none", dev, MYSID )
-			req.protocol = getVar( "SSLProtocol", ( ssl._VERSION or "0.5" ):find("^0%.5") and "tlsv1" or "any", dev, MYSID )
+			req.protocol = getVar( "SSLProtocol", ( ssl._VERSION or "0.5" ):find("^0%.[45]") and "tlsv1" or "any", dev, MYSID )
 			req.mode = getVar( "SSLMode", "client", dev, MYSID )
 			local s = split( getVar( "SSLOptions", nil, dev, MYSID ) or "" )
 			if #s > 0 then req.options = s end
@@ -1008,6 +1009,7 @@ local function runOnce(dev)
 	initVar(MYSID, "CurlOptions", "", dev)
 	initVar(MYSID, "CAFile", "", dev)
 	initVar( MYSID, "DeviceErrorOnFailure", 1, dev )
+	initVar( MYSID, "MaxResponseSize", 1, dev )
 
 	initVar(SSSID, "Armed", "0", dev)
 	initVar(SSSID, "Tripped", "0", dev)
@@ -1436,6 +1438,8 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
 		end
 		for ix=1,(tonumber(recipe.config.NumExp) or 8) do
 			recipe.config['Expr'..ix] = luup.variable_get( MYSID, "Expr"..ix, deviceNum ) or ""
+			local child = luup.variable_get( MYSID, "Child"..ix, deviceNum ) or ""
+			if child ~= "" then recipe.config['Child'..ix] = child end
 		end
 		r = [[<h2>Current Config</h2><pre>]]
 		r = r .. json.encode(recipe, { indent=true })
