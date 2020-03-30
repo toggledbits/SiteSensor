@@ -15,9 +15,9 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.16develop-20081"
+local _PLUGIN_VERSION = "1.15develop-20090"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
-local _CONFIGVERSION = 20081
+local _CONFIGVERSION = 20082
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local MYTYPE = "urn:schemas-toggledbits-com:device:SiteSensor:1"
@@ -30,6 +30,7 @@ local isALTUI = false
 local isOpenLuup = false
 local myChildren
 local logCapture = {}
+local logRequest = false
 local logMax = 50
 
 local http = require("socket.http")
@@ -153,10 +154,16 @@ end
 -- Capture log
 local function C(dev, msg, ...)
 	assert(type(dev)=="number")
-	local str = L(msg,...)
-	table.insert( logCapture, os.date("%X") .. ": " .. str )
-	if #logCapture > logMax then table.remove( logCapture, 1 ) end
-	luup.variable_set( MYSID, "LogCapture", table.concat( logCapture, "|" ), dev )
+	if logRequest then
+		local str = L(msg,...)
+		table.insert( logCapture, os.date("%X") .. ": " .. str )
+		if #logCapture > 0 and #logCapture > logMax then table.remove( logCapture, 1 ) end
+		luup.variable_set( MYSID, "LogCapture", table.concat( logCapture, "|" ), dev )
+	else
+		if ( luup.variable_get( MYSID, "LogCapture", dev ) or "" ) ~= "" then
+			luup.variable_set( MYSID, "LogCapture", "", dev )
+		end
+	end
 end
 
 local function split( str, sep )
@@ -166,6 +173,21 @@ local function split( str, sep )
 	local rest = string.gsub( str or "", "([^" .. sep .. "]*)" .. sep, function( m ) table.insert( arr, m ) return "" end )
 	table.insert( arr, rest )
 	return arr, #arr
+end
+
+local function getInstallPath()
+	if not installPath then
+		installPath = "/etc/cmh-ludl/" -- until we know otherwise
+		if isOpenLuup then
+			local loader = require "openLuup.loader"
+			if loader.find_file then
+				installPath = loader.find_file( "L_SiteSensor1.lua" ):gsub( "L_SiteSensor1.lua$", "" )
+			else
+				installPath = "./" -- punt
+			end
+		end
+	end
+	return installPath
 end
 
 local function findChild( id )
@@ -232,6 +254,12 @@ local function getVarNumeric( name, dflt, dev, serviceId )
 	local s = luup.variable_get(serviceId or MYSID, name, dev or pluginDevice) or ""
 	if s == "" then return dflt end
 	return tonumber(s) or dflt
+end
+
+local function deleteVar( sid, var, dev )
+	if luup.variable_get( sid, var, dev ) ~= nil then
+		luup.variable_set( sid, var, nil, dev )
+	end
 end
 
 local function isEnabled( dev )
@@ -306,36 +334,43 @@ function scheduleNext(dev, delay, stamp)
 		if delay < 30 then
 			L({level=2,msg="WARNING! Request interval of %1 may be shorter than connection timeout, and cause all kinds of problems."}, delay)
 		end
-
-		-- Now, see if we've missed an interval
-		local nextQuery = getVarNumeric("LastQuery", 0, dev) + delay
-		local now = os.time()
-		local nextDelay = nextQuery - now
-		if nextDelay <= 0 then
-			-- We missed an interval completely. ??? Maybe we should schedule forward?
-			D("scheduleNext() next should have been %1, now %2, we missed it!", nextQuery, now)
-			delay = 1
-		elseif nextDelay < delay then
-			-- Interval coming up sooner than full delay time.
-			D("scheduleNext() next coming a little sooner, reducing delay from %1 to %2", delay, nextDelay)
-			delay = nextDelay
-		end
 	end
+
+	-- When's our next query scheduled?
+	local nextQuery = getVarNumeric( "LastQuery", 0, dev ) + delay
+	D("scheduleNext() next query at %1", nextQuery)
 
 	-- See if we're doing eval ticks (rerunning evals between requests)
 	local qtype = luup.variable_get(MYSID, "ResponseType", dev) or "text"
 	if qtype == "json" then
-		local evalTick = getVarNumeric("EvalInterval", 0, dev)
-		if evalTick > 0 and evalTick < delay then
-			D("scheduleNext() reducing delay from %1 to %2 for EvalInterval", delay, evalTick)
-			delay = evalTick
+		local evalTick = getVarNumeric( "EvalInterval", 0, dev )
+		if evalTick > 0 then
+			local whence = getVarNumeric( "LastEval", 0, dev ) + evalTick -- when tick should have happened
+			if whence < nextQuery then
+				D("scheduleNext() re-eval is earlier than next query; %1 < %2", whence, nextQuery )
+				nextQuery = whence
+			end
+		end
+	end
+
+	-- OK. How long until next happens?
+	local now = os.time()
+	if nextQuery <= now then
+		-- We've missed an interval
+		L({level=2,msg="Missed interval! Expected to run at %1"}, nextQuery)
+		delay = 0 -- immediately!
+	else
+		local n = nextQuery - now
+		if n < delay then 
+			D("scheduleNext() scheduling for %1 delay %2 (reduced from %3)", nextQuery, n, delay)
+			delay = n 
 		end
 	end
 
 	-- Book it.
-	if delay < 1 then delay = 1 end
+	if delay < 0 then delay = 0 end
 	-- appendMessage( "; next at "..os.date("%X",os.time()+delay), dev)
-	L("Next activity in %1 seconds", delay)
+	L("Scheduling next activity in %1 seconds", delay)
 	luup.call_delay("siteSensorRunQuery", delay, string.format("%d:%d", stamp, dev))
 end
 
@@ -399,27 +434,8 @@ local function substitution( str, enc, dev )
 	return str
 end
 
--- Returns a LTN12 filter that stops sending data after limit bytes
-local function getcountfilter( limit )
-	local count = 0
-	return function( chunk )
-		if chunk == nil then
-			return nil
-		elseif chunk == "" then
-			return ""
-		else
-			local rem = limit - count
-			if rem <= 0 then return "" end
-			if rem > #chunk then rem = #chunk end
-			count = count + rem
-			return chunk:sub(1, rem)
-		end
-	end
-end
-
 local function doRequest(url, method, body, dev)
 	assert(dev ~= nil)
-	local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
 	if method == nil then method = "GET" end
 
 	-- A few other knobs we can turn
@@ -456,9 +472,38 @@ local function doRequest(url, method, body, dev)
 		end
 	end
 
+	--[[
+		Decide where query response storage will be. In order to reduce wear on flash, we try to
+		store the query on /tmp. Failing that, we'll store in on flash if we must.
+	--]]
+	local maxresp = getVarNumeric( "MaxResponseSize", 65536, dev, MYSID )
+	local fn = luup.variable_get( MYSID, "qf", dev ) or ""
+	if fn == "" or fn == "0" then
+		local evalint = getVarNumeric( "EvalInterval", 0, dev, MYSID )
+		local ff = "Q_SiteSensor_" .. tostring( dev ) .. ".txt"
+		if evalint == 0 and maxresp <= 262144 then
+			-- If not recurring evals and max < 256K, use /tmp for storage (a ramfs on Vera, volatile)
+			fn = "/tmp/" .. ff
+			os.remove( getInstallPath() .. ff )
+			os.remove( getInstallPath() .. ff .. ".lzo" )
+			-- Link in the install path makes it fetchable from Apps > Develop apps > Luup files
+			-- 20090: link doesn't work -- Luup files doesn't list symlinked files. :/
+			-- os.execute( "ln -s '"..fn..".lzo' '" .. getInstallPath() .. ff .. ".lzo'" )
+		else
+			-- Use flash/"real" storage
+			os.remove( "/tmp/" .. ff )
+			os.remove( "/tmp/" .. ff .. ".lzo" )
+			fn = getInstallPath() .. ff
+		end
+		luup.variable_set( MYSID, "qf", fn, dev )
+	end
+	os.remove( fn )
+	if not isOpenLuup then os.remove( fn..".lzo" ) end
+	D("doRequest() setting up response file %1 for max response length %1", fn, maxresp)
 	local respBody, httpStatus
 	if getVarNumeric( "UseCurl", 0, dev, MYSID ) ~= 0 then
-		local req = "curl -o -"
+		-- Use curl
+		local req = string.format( "curl -m %d -o '%s'", timeout, fn )
 		for k,v in pairs( tHeaders or {} ) do
 			req = req .. " -H '" .. k .. ": " .. v .. "'"
 		end
@@ -466,97 +511,114 @@ local function doRequest(url, method, body, dev)
 		if s ~= "" then req = req .. " " .. s end
 		req = req .. " '" .. url .. "'"
 		C(dev, req)
-		local f = io.popen( req )
-		if f then
-			respBody = f:read("*a")
-			f:close()
-			httpStatus = 200
-		else
+		local fst, ferr = os.execute( req )
+		if fst ~= 0 then
+			C(dev, "Request failed, %1", ferr)
+			L({level=1,msg="Curl request failed, %1 %2: %3"}, fst, ferr, req)
 			httpStatus = 500
-		end
-	else
-		-- Set up the request table
-		local r = {}
-		local rsink = ltn12.sink.table( r )
-		local maxresp = getVarNumeric( "MaxResponseSize", 65536, dev, MYSID )
-		D("doRequest() setting up for max response length %1", maxresp)
-		local counter = getcountfilter( maxresp )
-		local req = {
-			url = url,
-			source = src,
-			sink = ltn12.sink.chain( counter, rsink ),
-			method = method,
-			headers = tHeaders,
-			redirect = false
-		}
-
-		-- HTTP or HTTPS?
-		local requestor
-		if url:lower():find("https:") then
-			requestor = https
-			req.verify = getVar( "SSLVerify", "none", dev, MYSID )
-			req.protocol = getVar( "SSLProtocol", ( ssl._VERSION or "0.5" ):find("^0%.[45]") and "tlsv1" or "any", dev, MYSID )
-			req.mode = getVar( "SSLMode", "client", dev, MYSID )
-			local s = split( getVar( "SSLOptions", nil, dev, MYSID ) or "" )
-			if #s > 0 then req.options = s end
-			req.cafile = getVar( "CAFile", nil, dev, MYSID )
-			C(dev, "Set up for HTTPS request, verify=%1, protocol=%2, options=%3",
-				req.verify, req.protocol, req.options)
 		else
-			requestor = http
+			httpStatus = 200
 		end
-
-		-- Make the request.
-		http.TIMEOUT = timeout -- N.B. http not https, regardless
-		if logRequest then
-			C(dev, "%2 %1, headers=%3", url, method, tHeaders)
-		end
-		local rh, st
-		respBody, httpStatus, rh, st = requestor.request(req)
-		D("doRequest() request returned httpStatus=%1, respBody=%2, respHeaders=%3, status=%4", httpStatus, respBody, rh, st)
-
-		-- Since we're using the table sink, concatenate chunks to single string.
-		respBody = table.concat(r)
-		r = nil -- luacheck: ignore 311
-	end
-
-	if logRequest then
-		L("Response HTTP status %1, body=" .. respBody, httpStatus) -- use concat to avoid quoting
-	end
-
-	-- Handle special errors from socket library
-	if tonumber(httpStatus) == nil then
-		respBody = httpStatus
-		httpStatus = 500
-	end
-
-	if #respBody > 32768 then
-		luup.variable_set( MYSID, "RawResponse", '{ "error": "response is too long to store, '..#respBody..' bytes" }', dev )
 	else
-		luup.variable_set( MYSID, "RawResponse", respBody or "nil!", dev )
+		-- Use http module
+		local f, ferr = io.open( fn, "w" )
+		if not f then
+			C(dev, "Can't open %1: %2", fn, ferr)
+			L({level=1,msg="Failed to open %1: %2"}, fn, ferr)
+			httpStatus = 500
+		else
+			local req = {
+				url = url,
+				source = src,
+				sink = ltn12.sink.file( f ),
+				method = method,
+				headers = tHeaders,
+				redirect = false
+			}
+
+			-- HTTP or HTTPS?
+			local requestor
+			if url:lower():find("https:") then
+				requestor = https
+				req.verify = getVar( "SSLVerify", "none", dev, MYSID )
+				req.protocol = getVar( "SSLProtocol", ( ssl._VERSION or "0.5" ):find("^0%.[45]") and "tlsv1" or "any", dev, MYSID )
+				req.mode = getVar( "SSLMode", "client", dev, MYSID )
+				local s = split( getVar( "SSLOptions", nil, dev, MYSID ) or "" )
+				if #s > 0 then req.options = s end
+				req.cafile = getVar( "CAFile", nil, dev, MYSID )
+				C(dev, "Set up for HTTPS request, verify=%1, protocol=%2, options=%3",
+					req.verify, req.protocol, req.options)
+			else
+				requestor = http
+			end
+
+			-- Make the request.
+			http.TIMEOUT = timeout -- N.B. http not https, regardless
+			C(dev, "%2 %1, headers=%3", url, method, tHeaders)
+			local rh, st
+			respBody, httpStatus, rh, st = requestor.request( req )
+			D("doRequest() request returned httpStatus=%1, respBody=%2, respHeaders=%3, status=%4", httpStatus, respBody, rh, st)
+
+			pcall( io.close, f ) -- make sure we're closed
+
+			-- Handle special errors from socket library
+			httpStatus = tonumber( httpStatus ) or 500
+		end
+	end
+
+	-- Read response from temporary file; truncate to limit
+	if httpStatus >= 200 and httpStatus <= 299 then
+		D("doRequest() reading response file %1", fn)
+		local f, err = io.open( fn, "r" )
+		if not f then
+			C(dev, "Can't read response file "..fn..": "..tostring(err))
+			respBody = ""
+			httpStatus = 500
+		else
+			respBody = f:read( maxresp )
+			local n = f:seek( "end" )
+			D("doRequest() read %1 bytes of %2; limit %3", #respBody, n, maxresp)
+			if n > maxresp then
+				C(dev, "WARNING: Response was truncated to limit of %1 bytes; %2 total bytes received in %3", maxresp, n, fn)
+			else
+				C(dev, "Response is %1 bytes in %2", #respBody, fn)
+			end
+			f:close()
+			-- On Vera, compress the file so it's fetchable from Apps > Develop apps > Luup files
+			if not isOpenLuup then
+				if os.execute( "pluto-lzo c '"..fn.."' '"..fn..".lzo'" ) then
+					os.remove( fn )
+				end
+			end
+		end
+	else
+		respBody = httpStatus
+		os.remove( fn )
 	end
 
 	-- See what happened. Anything 2xx we reduce to 200 (OK).
 	if httpStatus >= 200 and httpStatus <= 299 then
-		-- Success response with no data, take shortcut.
+		-- Success
 		return false, respBody, 200
 	end
+	-- Error response
 	return true, respBody, httpStatus
 end
 
 local function doMatchQuery( dev )
 	assert(dev ~= nil)
 
+	setMessage("Performing query...", dev)
+
 	local method = "GET"
-	local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
 	local url = (luup.variable_get(MYSID, "RequestURL", dev) or ""):gsub( "^%s+", "" ):gsub( "%s+$", "" )
 	local pattern = luup.variable_get(MYSID, "Pattern", dev) or "^HTTP/1.. 200"
 	local timeout = getVarNumeric("Timeout", 30, dev)
 	local trigger = luup.variable_get(MYSID, "Trigger", dev) or nil
 
 	-- Clear log capture for new request
+	logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
 	logCapture = {}
-	setMessage("Performing query...", dev)
 
 	-- Perform on-the-fly substitution of request values
 	url = substitution( url, urlencode, dev )
@@ -627,7 +689,7 @@ local function doMatchQuery( dev )
 	if url:lower():find("^https:") then
 		requestor = https
 		req.verify = getVar( "SSLVerify", "none", dev, MYSID )
-		req.protocol = getVar( "SSLProtocol", ( ssl._VERSION or "0.5" ):match("^0%.5") and "tlsv1" or "any", dev, MYSID )
+		req.protocol = getVar( "SSLProtocol", ( ssl._VERSION or "0.5" ):match("^0%.[45]") and "tlsv1" or "any", dev, MYSID )
 		req.mode = getVar( "SSLMode", "client", dev, MYSID )
 		local s = split( getVar( "SSLOptions", nil, dev, MYSID ) or "" )
 		if #s > 0 then req.options = s end
@@ -643,9 +705,8 @@ local function doMatchQuery( dev )
 	-- We don't use doRequest here because we can stop and close the
 	-- connection as soon as we find our pattern string.
 	http.TIMEOUT = timeout
-	if logRequest then
-		C(dev, "HTTP %2 %1, headers=%3", url, method, tHeaders)
-	end
+	C(dev, "HTTP %2 %1, headers=%3", url, method, tHeaders)
+
 	D("doMatchQuery() sending req=%1", req)
 	local cond, httpStatus, httpHeaders = requestor.request(req)
 	--[[ Notes
@@ -658,16 +719,12 @@ local function doMatchQuery( dev )
 	D("doMatchQuery() returned from request(), matched=%1, err=%2, cond=%3, httpStatus=%4, httpHeaders=%5",
 		matched, err, tostring(cond), httpStatus, httpHeaders)
 	if err or ( cond==nil and httpStatus==nil) then
-		if logRequest then
-			C(dev, "Request failed: %1", httpStatus or "connection failure")
-		end
+		C(dev, "Request failed: %1", httpStatus or "connection failure")
 		setMessage("Request error: " .. ( httpStatus or "connection failure" ), dev)
 		setVar(MYSID, "LastMatchValue", "", dev)
 		fail(true, dev)
 	else
-		if logRequest then
-			C(dev, "Request succeeded, %2 match: %1", httpStatus or "OK", matched and "with" or "no" )
-		end
+		C(dev, "Request succeeded, %2 match: %1", httpStatus or "OK", matched and "with" or "no" )
 		setMessage( "Valid response; " .. ( matched and "matched!" or "no match." ), dev )
 		local lastVal = luup.variable_get(MYSID, "LastMatchValue", dev)
 		if lastVal == nil or lastVal ~= matchValue then
@@ -689,7 +746,6 @@ local function doMatchQuery( dev )
 	trip(newTrip, dev)
 
 	-- Clear JSON request fields
-	luup.variable_set( MYSID, "LastResponse", "", dev )
 	local numexp = getVarNumeric( "NumExp", 8, dev, MYSID )
 	for k=1,numexp do
 		setVar(MYSID, "Value" .. tostring(k), "", dev)
@@ -725,7 +781,7 @@ end
 
 
 local function doEval( dev, ctx )
-	local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
+	logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
 	local numErrors = 0
 
 	-- Since we got a valid response, indicate not tripped, unless using TripExpression, then that.
@@ -733,25 +789,58 @@ local function doEval( dev, ctx )
 	setMessage("Retrieving last response...", dev)
 
 	if ctx == nil then
-		local lr = luup.variable_get( MYSID, "LastResponse", dev ) or ""
-		if lr == "" then
+		local maxresp = getVarNumeric( "MaxResponseSize", 65536, dev, MYSID )
+		local isPipe = false
+		local fn = luup.variable_get( MYSID, "qf", dev ) or ( getInstallPath() .. "Q_SiteSensor_" .. tostring(dev) .. ".txt" )
+		local f, ferr = io.open( fn, "r" )
+		if not ( f or isOpenLuup ) then
+			f = io.popen( "pluto-lzo d '" .. fn .. ".lzo' /proc/self/fd/1" )
+			isPipe = f ~= nil
+			L("opened LZO file %1", f)
+		end
+		-- Tricky. If we opened a pipe, it will be open even if command fails, so we won't know
+		-- until we read that the pipe is broken.
+		local lr
+		if f then
+			lr = f:read( maxresp )
+		end
+		if not ( f and lr ) then
+			luup.variable_set( MYSID, "LastQuery", 0, dev ) -- force update
+			L({level=2,msg="doEval() failed to open %1: %2"}, fn, ferr)
 			C(dev, "No prior response stored to re-evaluate.")
 			setMessage( "Empty or invalid response data.", dev )
 			fail( true, dev )
 			return
 		end
-		local pos, err
-		ctx, pos, err = json.decode( lr, 1, luaxp.NULL )
+		local n
+		if isPipe then
+			-- Can't seek on a pipe; read to EOF for length
+			n = #lr -- actual length may be smaller than maxresp
+			repeat
+				local t = f:read(2048)
+				if t then n = n + #t end
+			until not t
+		else
+			n = f:seek( "end" )
+		end
+		f:close()
+		if n > maxresp then
+			C(dev, "WARNING: Response truncated to %1 bytes; %2 bytes actually received", maxresp, n)
+		else
+			C(dev, "Reloaded %1 bytes from previous response", #lr)
+		end
+		local data, pos, err = json.decode( lr, 1, luaxp.NULL )
+		ctx = { response=data, status={ valid=1, jsonStatus="OK", httpStatus=200 } }
 		if err then
-			C(dev, "Unable parse stored prior result. That's... unexpected. %1 at %2", err, pos)
-			setMessage( "Invalid JSON in response.", dev )
-			fail( true, dev )
-			return
+			ctx.status.valid = 0
+			ctx.jsonStatus = string.format("%s, at %s", tostring(err), tostring(pos))
+		else
+			C(dev, "Re-evaluating previously received response")
 		end
 	end
 
 	-- Valid response?
-	if ctx.status.valid == 0 then
+	if ( ctx.status.valid or 0 ) == 0 then
 		local msg = "Last query failed, "
 		if ctx.status.httpStatus ~= 200 then
 			msg = msg .. "HTTP status " .. tostring(ctx.status.httpStatus)
@@ -764,6 +853,7 @@ local function doEval( dev, ctx )
 	end
 
 	ctx.__functions = ctx.__functions or {}
+	ctx.__lvars = ctx.__lvars or {}
 	ctx.__functions.finddevice = function( args )
 		local selector, trouble = unpack( args )
 		D("findDevice(%1) selector=%2", args, selector)
@@ -783,25 +873,27 @@ local function doEval( dev, ctx )
 
 	-- Valid response. Let's parse it and set our variables.
 	local numexp = getVarNumeric( "NumExp", 8, dev, MYSID )
-	ctx.expr = {}
+	ctx.__lvars.expr = {}
 	for i = 1,numexp do
 		local r = nil
 		local ex = luup.variable_get(MYSID, "Expr" .. tostring(i), dev) or ""
 		if not logRequest then D("doEval() Expr%1=%2", i, ex or "nil") end
 		if ex ~= "" then
 			r = parseRefExpr(ex, ctx, dev)
-			if logRequest then C(dev, "Eval #%1: %2=(%3)%4", i, ex, type(r), r) end
+			C(dev, "Eval #%1: %2=(%3)%4", i, ex, type(r), r)
 			D("doEval() parsed value of %1 is %2", ex, tostring(r))
 			if r == nil then
 				numErrors = numErrors + 1
 			end
+			-- Add raw result to context (available to subsequent expressions)
+			ctx.__lvars.expr[i] = r -- raw, not canonical
 		else
 			setVar(MYSID, "Expr" .. tostring(i), "", dev)
 		end
 
 		-- Canonify the result value
 		local rv
-		if r == nil then
+		if r == nil or luaxp.isNull( r ) then
 			rv = ""
 		elseif type(r) == "boolean" then
 			if r then rv = "true" else rv = "false" end
@@ -810,9 +902,6 @@ local function doEval( dev, ctx )
 		else
 			rv = tostring(r)
 		end
-
-		-- Add raw result to context (available to subsequent expressions)
-		ctx.expr[i] = r -- raw, not canonical
 
 		-- Save to device state if changed.
 		local oldVal = luup.variable_get(MYSID, "Value" .. tostring(i), dev)
@@ -861,7 +950,7 @@ local function doEval( dev, ctx )
 		if texp ~= nil then r = parseRefExpr(texp, ctx, dev) end
 		if r == nil then numErrors = numErrors + 1 end
 		D("doEval() TripExpression result is %1", r)
-		if logRequest then C(dev, "Eval trip expression: %1=(%2)%3", texp, type(r), r) end
+		C(dev, "Eval trip expression: %1=(%2)%3", texp, type(r), r)
 		if r == nil
 			or ( type(r) == "boolean" and r == false )
 			or ( type(r) == "number" and r == 0 )
@@ -898,27 +987,26 @@ end
 
 local function doJSONQuery(dev)
 	assert(dev ~= nil)
-	local logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
 	local url = luup.variable_get(MYSID, "RequestURL", dev) or ""
 	local ttype = luup.variable_get(MYSID, "Trigger", dev) or "err"
 
 	-- Clear log capture for new request
+	logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
 	logCapture = {}
 
 	setMessage("Requesting JSON...", dev)
-	if logRequest then C(dev, "Requesting JSON data") end
+	C(dev, "Requesting JSON data")
 	local err,body,httpStatus = doRequest(url, "GET", nil, dev)
 	local ctx = { status={ timestamp=os.time(), valid=0, httpStatus=httpStatus } }
 	if body == nil or err then
 		-- Error; trip sensor
-		ctx.jsonStatus = "No data"
+		ctx.status.jsonStatus = "No data"
 		C(dev, "Request returned no data")
 		D("doJSONQuery() setting tripped and bugging out...")
 		fail(true, dev)
 		if ttype == "err" then trip(true, dev) end
-		luup.variable_set( MYSID, "LastResponse", "", dev )
 	else
-		if #body >= 128072 then
+		if #body >= 65536 then
 			C(dev, "WARNING: the response from this site is quite large! (%1 bytes)", #body)
 		end
 		D("doJSONQuery() fixing up JSON response (%1 bytes) for parsing", #body)
@@ -944,22 +1032,6 @@ local function doJSONQuery(dev)
 			ctx.status.jsonStatus = "OK"
 			ctx.response = t
 			fail(false, dev)
-		end
-
-		if getVarNumeric( "EvalInterval", 0, dev ) > 0 then
-			-- Eval interval, store last response for re-eval
-			local lr = json.encode( ctx )
-			if not lr or type(lr) ~= "string" then
-				C(dev, "Unable to encode response for storage; re-evaluation is not possible.")
-				luup.variable_set( MYSID, "LastResponse", "", dev )
-			elseif #lr > getVarNumeric( "LastResponseLimit", 65536, dev ) then
-				C(dev, "Site response is too large to store for re-evaluation (%1 bytes received)", #lr)
-				luup.variable_set( MYSID, "LastResponse", "", dev )
-			else
-				luup.variable_set( MYSID, "LastResponse", lr, dev )
-			end
-		else
-			luup.variable_set( MYSID, "LastResponse", "", dev )
 		end
 	end
 
@@ -1017,6 +1089,10 @@ local function runOnce(dev)
 
 	-- No matter what happens above, if our versions don't match, force that here/now.
 	if rev < _CONFIGVERSION then
+		deleteVar( MYSID, "RawResponse", dev )
+		deleteVar( MYSID, "LastResponse", dev )
+		deleteVar( MYSID, "LastResponseLimit", dev )
+
 		luup.variable_set(MYSID, "Version", _CONFIGVERSION, dev)
 	end
 end
@@ -1062,7 +1138,8 @@ function runQuery(p)
 	local qtype = luup.variable_get(MYSID, "ResponseType", dev) or "text"
 	if timeNow >= ( last + interval ) then
 		-- Mark time, always, even if the query fails.
-		luup.variable_set(MYSID, "LastQuery", timeNow, dev)
+		luup.variable_set( MYSID, "LastQuery", timeNow, dev )
+		luup.variable_set( MYSID, "LastEval", timeNow, dev )
 
 		-- What type of query?
 		if qtype == "json" then
@@ -1075,6 +1152,7 @@ function runQuery(p)
 		local evalTick = getVarNumeric( "EvalInterval", 0, dev )
 		if evalTick > 0 then
 			L("Performing re-evaluation of prior response")
+			luup.variable_set( MYSID, "LastEval", timeNow, dev )
 			doEval( dev ) -- pass no context, doEval will reproduce it
 		end
 	end
@@ -1207,7 +1285,7 @@ function init(dev)
 					newFavoriteFunc="SiteSensor_ALTUI.Favorite"
 				}, k )
 			D("init() ALTUI's RegisterPlugin action returned resultCode=%1, resultString=%2, job=%3, returnArguments=%4", rc,rs,jj,ra)
-		elseif v.device_type == "openLuup" then
+		elseif v.device_type == "openLuup" and v.device_num_parent == 0 then
 			D("init() detected openLuup")
 			isOpenLuup = true
 
@@ -1322,7 +1400,7 @@ end
 function requestHandler(lul_request, lul_parameters, lul_outputformat)
 	D("requestHandler(%1,%2,%3) luup.device=%4", lul_request, lul_parameters, lul_outputformat, luup.device)
 	local action = lul_parameters['action'] or lul_parameters["command"] or ""
-	local deviceNum = tonumber( lul_parameters['device'], 10 ) or luup.device
+	local deviceNum = tonumber( lul_parameters['device'], 10 ) or pluginDevice
 	if action == "debug" then
 		local err,msg,job,args = luup.call_action( MYSID, "SetDebug", { debug=1 }, deviceNum )
 		return string.format("Device #%s result: %s, %s, %s, %s", tostring(deviceNum), tostring(err), tostring(msg), tostring(job), dump(args))
@@ -1466,6 +1544,16 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
 			luup.variable_set( MYSID, k, v, deviceNum )
 		end
 		return "OK\nRecipe " .. tostring(data.name) .. " loaded.\n"..recipe, "text/plain"
+
+	elseif action == "qdiag" and not isOpenLuup then
+		local qd = getInstallPath() .. "qdiag-" .. deviceNum .. ".tmp.lzo"
+		os.remove( qd )
+		local fn = luup.variable_get( MYSID, "qf", deviceNum ) or "/notexists"
+		if os.execute( "cp '" .. fn .. ".lzo' '" .. qd .. "'" ) == 0 then
+			return "OK\n" .. qd .. " updated; download it now from Apps > Develop apps > Luup files", "text/plain"
+		else
+			return "ERROR\n" .. fn .. " could not be copied to " .. qd, "text/plain"
+		end
 
 	end
 

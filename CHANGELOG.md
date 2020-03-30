@@ -1,18 +1,15 @@
 # CHANGELOG #
 
-## Version 1.16 (development)
+## Version 1.15 (development)
 
-* Enhancement: Actively limit response size by discard data over `MaxResponseSize` bytes (default 65536). This prevents a massive response from the server from overrunning and crashing the Vera.
 * Enhancement: Recipes! You can now save your SiteSensor configuration as a portable recipe, and load recipes you've saved or gotten from others.
-
-## Version 1.15 (released)
-
-* Fix: Make sure dkjson decodes "null" to LuaXP's *null* value rather than Lua `nil`.
-* Fix: Some versions of Luasec require the SSL protocol to be set, they don't default, so use "all" for LuaSec > 0.5 (7.31 firmware except Edge), and "tlsv1" for 0.5.
+* Enhancement: Actively limit response size by discarding data over `MaxResponseSize` bytes (default 65536). This prevents a massive response from the server from overrunning and crashing the Vera. Responses are also stored on a filesystem rather than state variables, to avoid explosive size increases in user_data. The storage location is found in the "qf" state variable of the SiteSensor.
 * Enhancement: Force default room for child device to same room as parent at initialization (can be moved after).
 * Enhancement: When a new child is created, copy the current value of the expression to the newly-initialized child.
 * Enhancement: Load and create recipes. A recipe is a saved/packaged configuration that can be deployed easily.
 * Enhancement: Add `SetEnabled` action (parameter `newEnabledValue`) to set enable/disable state of a SiteSensor. When disabled, queries are not run. This provides an alternate mechanism to the arm/disarm control to control queries without Luup notifications that accompany security sensor arming state. Requested by whyfseeguy.
+* Fix: Make sure dkjson decodes "null" to LuaXP's *null* value rather than Lua `nil`.
+* Fix: Some versions of Luasec require the SSL protocol to be set, they don't default, so use "all" for LuaSec > 0.5 (7.31 firmware except Edge), and "tlsv1" for 0.4 and 0.5.
 
 ## Version 1.14 (released)
 
