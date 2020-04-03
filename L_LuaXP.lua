@@ -1350,7 +1350,9 @@ _run = function( atom, ctx, stack )
 				.. base.type(v1) .. e.op .. base.type(v2) .. ")", e.pos) end
 			v = v1 >= v2
 		elseif e.op == '==' then
-			if base.type(v1) == "boolean" or base.type(v2) == "boolean" then
+			if isNull(v1) or isNull(v2) then
+				v = isNull(v1) and isNull(v2)
+			elseif base.type(v1) == "boolean" or base.type(v2) == "boolean" then
 				v = coerce(v1, "boolean") == coerce(v2, "boolean")
 			elseif (base.type(v1) == "number" or base.type(v2) == "number") and isNumeric(v1) and isNumeric(v2) then
 				-- Either is number and both have valid numeric representation, treat both as numbers
@@ -1360,7 +1362,9 @@ _run = function( atom, ctx, stack )
 				v = coerce(v1, "string") == coerce(v2, "string")
 			end
 		elseif e.op == '<>' or e.op == '!=' or e.op == '~=' then
-			if base.type(v1) == "boolean" or base.type(v2) == "boolean" then
+			if isNull(v1) or isNull(v2) then
+				v = not ( isNull(v1) and isNull(v2) )
+			elseif base.type(v1) == "boolean" or base.type(v2) == "boolean" then
 				v = coerce(v1, "boolean") == coerce(v2, "boolean")
 			elseif (base.type(v1) == "number" or base.type(v2) == "number") and isNumeric(v1) and isNumeric(v2) then
 				v = coerce(v1, "number") ~= coerce(v2, "number")
