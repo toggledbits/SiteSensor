@@ -880,7 +880,11 @@ local function doEval( dev, ctx )
 		if not logRequest then D("doEval() Expr%1=%2", i, ex or "nil") end
 		if ex ~= "" then
 			r = parseRefExpr(ex, ctx, dev)
-			C(dev, "Eval #%1: %2=(%3)%4", i, ex, type(r), r)
+			if luaxp.isNull( r ) then
+				C(dev, "Eval #%1: %2=null", i, ex)
+			else
+				C(dev, "Eval #%1: %2=("..type(r)..")%3", i, ex, r)
+			end
 			D("doEval() parsed value of %1 is %2", ex, tostring(r))
 			if r == nil then
 				numErrors = numErrors + 1
@@ -942,16 +946,20 @@ local function doEval( dev, ctx )
 	end
 
 	-- Handle the trip expression
-	local texp = luup.variable_get(MYSID, "TripExpression", dev)
 	local ttype = luup.variable_get(MYSID, "Trigger", dev) or "err"
 	if ttype == "expr" then
+		local texp = luup.variable_get(MYSID, "TripExpression", dev)
+		if texp == "" then texp = nil end
 		D("doEval() parsing TripExpression %1", texp)
-		local r = nil
-		if texp ~= nil then r = parseRefExpr(texp, ctx, dev) end
+		local r = parseRefExpr(texp or "null", ctx, dev)
 		if r == nil then numErrors = numErrors + 1 end
 		D("doEval() TripExpression result is %1", r)
-		C(dev, "Eval trip expression: %1=(%2)%3", texp, type(r), r)
-		if r == nil
+		if luaxp.isNull(r) then
+			C(dev, "Eval trip expression: %1=null", texp)
+		else
+			C(dev, "Eval trip expression: %1=(%2)%3", texp, type(r), r)
+		end
+		if r == nil or luaxp.isNull(r)
 			or ( type(r) == "boolean" and r == false )
 			or ( type(r) == "number" and r == 0 )
 			or ( type(r) == "string" and ( string.len(r) == 0 or r == "0" or r:lower() == "false" ) ) -- some magic strings
@@ -1555,6 +1563,9 @@ function requestHandler(lul_request, lul_parameters, lul_outputformat)
 		else
 			return "ERROR\n" .. fn .. " could not be copied to " .. qd, "text/plain"
 		end
+
+	elseif action == "alive" then
+		return '{"status":true}', "application/json"
 
 	end
 

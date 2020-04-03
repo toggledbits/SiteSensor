@@ -467,6 +467,52 @@ var SiteSensor = (function(api, $) {
 		handleRecipeChange();
 	}
 
+	function waitForReloadComplete( msg ) {
+		return new Promise( function( resolve, reject ) {
+			var expire = Date.now() + 90000;
+			var dlg = false;
+			function tryAlive() {
+				$.ajax({
+					url: api.getDataRequestURL(),
+					data: {
+						id: "lr_SiteSensor",
+						action: "alive"
+					},
+					dataType: "json",
+					timeout: 5000
+				}).done( function( data ) {
+					if ( data && data.status ) {
+						if (dlg) $("#myModal").modal("hide");
+						resolve( true );
+					} else {
+						if ( ! $("#myModal").is(":visible") ) {
+							api.showCustomPopup( msg || "Waiting for Luup ready before operation...", { autoHide: false, category: 3 } );
+							dlg = true;
+						}
+						if ( Date.now() >= expire ) {
+							if (dlg) $("#myModal").modal("hide");
+							reject( "timeout" );
+						} else {
+							setTimeout( tryAlive, 2000 );
+						}
+					}
+				}).fail( function() {
+					if ( Date.now() >= expire ) {
+						if (dlg) $("#myModal").modal("hide");
+						reject( "timeout" );
+					} else {
+						if ( ! $("#myModal").is(":visible") ) {
+							api.showCustomPopup( msg || "Waiting for Luup ready before operation...", { autoHide: false, category: 3 } );
+							dlg = true;
+						}
+						setTimeout( tryAlive, 5000 );
+					}
+				});
+			}
+			tryAlive();
+		});
+	}
+
 	function handleApply() {
 		if ( confirm( "Applying this recipe will overwrite this SiteSensor's configuration. OK?" ) ) {
 			var $el = $( 'textarea#loadrecipe' );
@@ -505,6 +551,22 @@ var SiteSensor = (function(api, $) {
 			$( '.recipealert' ).text("Recipe applied!");
 			$( '#origdata' ).val( JSON.stringify( data, null, 4 ) );
 			handleRecipeChange();
+
+			/* Reload? */
+			if ( confirm( "Recipe applied!. A Luup reload is recommended. Press OK to reload now, or Cancel to reload later." ) ) {
+				api.performActionOnDevice( 0, "urn:micasaverde-com:serviceId:HomeAutomationGateway1", "Reload",
+					{ actionArguments: { Reason: "User-requested reload from SiteSensor" } } );
+				setTimeout( function() {
+					waitForReloadComplete("Waiting for Luup ready...").then( function() {
+						needsReload = false; /* we've done it */
+						$("#myModal").modal("hide");
+					}).catch( function(reason) {
+						$("#myModal").modal("hide");
+					});
+				}, 2000 );
+			} else {
+				needsReload = true;
+			}
 		}
 	}
 
