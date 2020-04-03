@@ -467,7 +467,7 @@ local function doRequest(url, method, body, dev)
 		for _,hh in ipairs(h) do
 			local nh = split(hh, ":")
 			if #nh == 2 then
-				tHeaders[nh[1]] = substitution( urldecode( nh[2] ), nil, dev )
+				tHeaders[nh[1]] = substitution( urldecode( nh[2] ), nil, dev ):gsub("^%s+",""):gsub("%s+$","")
 			end
 		end
 	end
@@ -546,8 +546,8 @@ local function doRequest(url, method, body, dev)
 				local s = split( getVar( "SSLOptions", nil, dev, MYSID ) or "" )
 				if #s > 0 then req.options = s end
 				req.cafile = getVar( "CAFile", nil, dev, MYSID )
-				C(dev, "Set up for HTTPS request, verify=%1, protocol=%2, options=%3",
-					req.verify, req.protocol, req.options)
+				C(dev, "Set up for HTTPS (%4) request, verify=%1, protocol=%2, options=%3",
+					req.verify, req.protocol, req.options, ssl._VERSION)
 			else
 				requestor = http
 			end
@@ -694,8 +694,8 @@ local function doMatchQuery( dev )
 		local s = split( getVar( "SSLOptions", nil, dev, MYSID ) or "" )
 		if #s > 0 then req.options = s end
 		req.cafile = getVar( "CAFile", nil, dev, MYSID )
-		C(dev, "Set up for HTTPS request, verify=%1, protocol=%2, options=%3",
-			req.verify, req.protocol, req.options)
+		C(dev, "Set up for HTTPS (%4) request, verify=%1, protocol=%2, options=%3",
+			req.verify, req.protocol, req.options, ssl._VERSION)
 	else
 		requestor = http
 	end
@@ -1001,7 +1001,7 @@ local function doJSONQuery(dev)
 	if body == nil or err then
 		-- Error; trip sensor
 		ctx.status.jsonStatus = "No data"
-		C(dev, "Request returned no data")
+		C(dev, "Request returned no data, status %1", httpStatus)
 		D("doJSONQuery() setting tripped and bugging out...")
 		fail(true, dev)
 		if ttype == "err" then trip(true, dev) end
@@ -1012,6 +1012,7 @@ local function doJSONQuery(dev)
 		D("doJSONQuery() fixing up JSON response (%1 bytes) for parsing", #body)
 		setMessage("Parsing response...", dev)
 		-- Fix booleans, which json doesn't seem to understand (gives nil)
+		-- ??? This does not seem to be issue any more? 2020-04-03
 		body = string.gsub( body, ": *true *,", ": 1," )
 		body = string.gsub( body, ": *false *,", ": 0," )
 
