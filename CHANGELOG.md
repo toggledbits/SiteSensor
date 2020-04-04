@@ -4,6 +4,7 @@
 
 * Enhancement: Recipes! You can now save your SiteSensor configuration as a portable recipe, and load recipes you've saved or gotten from others.
 * Enhancement: Actively limit response size by discarding data over `MaxResponseSize` bytes (default 65536). This prevents a massive response from the server from overrunning and crashing the Vera. Responses are also stored on a filesystem rather than state variables, to avoid explosive size increases in user_data. The storage location is found in the "qf" state variable of the SiteSensor.
+* Enhancement: State variable `FollowRedirects` (default 0, off) can be set to 1 to enable following of redirects from the endpoint.
 * Enhancement: State variable `FailMasterOnExpressionError` controls whether the SiteSensor device is marked as failed in Luup (red highlight in UI) when an expression error occurs. Default 1 (true)
 * Enhancement: State variable `FailChildOnExpressionError` controls whether a SiteSensor child virtual sensor is marked as failed in Luup (red highlight in UI) when its expression fails (i.e. throws an error). Default 1 (true)
 * Enhancement: State variable `BlankChildOnExpressionError` controls whether a failed expression on a child virtual sensor clears (to blank) the sensor value or leaves the previous value. Default 0 (false): the previous is left on the virtual sensor untouched.
