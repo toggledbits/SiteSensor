@@ -423,7 +423,7 @@ var SiteSensor = (function(api, $) {
 			lines.push( blk );
 			lines.push( "=== END SITESENSOR RECIPE ===" );
 		} catch (ex) {
-			lines.push( "*** INVALID CONFIGURATION -- SEE BELOW ***");
+			lines.push( "*** INVALID CONFIGURATION -- CORRECT ERRORS SHOWN BELOW ***");
 			lines.push(String(ex));
 			var m = ex.toString().match( /at position (\d+)/ );
 			if ( m ) {
@@ -436,11 +436,26 @@ var SiteSensor = (function(api, $) {
 		$("#blockdata").val( lines.join( "\n" ) );
 	}
 
+	/* Since JS can't return day of year, we compute it for our version stamp. All is UTC here,
+	   taking timezone out of the mix so that versions are comparable all over the world. Our
+	   version string is YYDDD.HHMM, where DDD is the day of the year (all UTC) */
+	function getVersion() {
+		function zfill( n, l ) {
+			var str = String(n);
+			while ( str.length < l ) str = '0' + str;
+			return str;
+		}
+		var now = new Date();
+		var SoY = Date.UTC( now.getUTCFullYear(), 0, 0 ); /* Start of Year */
+		var jd = Math.floor( ( now - SoY ) / 86400000 ); /* day of year */
+		return zfill( now.getUTCFullYear() % 100, 2 ) +
+			zfill( jd, 3 ) + "." + zfill( now.getUTCHours(), 2 ) + zfill( now.getUTCMinutes(), 2 );
+	}
+
 	function makeCurrentRecipe( myid ) {
 		var val;
 		var name = api.getDeviceAttribute( myid, "name" ) || myid;
-		var data = { "name":name, "author": "", version: "", description: "", config:{} };
-		data.version = Math.floor( Date.now() / 1000 );
+		var data = { "name":"", "author": "", description: "", config:{} };
 		var nvars = recipeVars.length;
 		for ( var ix=0; ix<recipeVars.length; ix++ ) {
 			val = api.getDeviceState( myid, serviceId, recipeVars[ix] ) || "";
@@ -449,6 +464,7 @@ var SiteSensor = (function(api, $) {
 			}
 		}
 		data.source = api.getDeviceState( myid, serviceId, "Version" ) || 0;
+		data.version = getVersion();
 		var numexp = parseInt( data.config.NumExp ) || 8;
 		for ( ix=1; ix<=numexp; ix++ ) {
 			var exname = "Expr" + ix;
@@ -547,7 +563,15 @@ var SiteSensor = (function(api, $) {
 			for ( ix=1; ix<numexp; ++ix ) {
 				vname = "Expr" + ix;
 				api.setDeviceStateVariablePersistent( devnum, serviceId, vname, data.config[vname] || "" );
+				vname = "Child" + ix;
+				api.setDeviceStateVariablePersistent( devnum, serviceId, vname, data.config[vname] || "" );
 			}
+
+			/* Stamp the SiteSensor */
+			api.setDeviceStateVariablePersistent( devnum, serviceId, "LastRecipe",
+				String( data.name ) + ";" + String( data.author ) + ";" + String( data.version ) +
+				";" + String( Math.floor( Date.now() / 1000 ) ) );
+
 			/* Done! */
 			$( '.recipealert' ).text("Recipe applied!");
 			$( '#origdata' ).val( JSON.stringify( data, null, 4 ) );
