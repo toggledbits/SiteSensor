@@ -285,14 +285,8 @@ local function fail(failState, dev)
 		local fval = failState and 1 or 0
 		setVar(MYSID, "Failed", fval, dev or pluginDevice)
 	end
-	if getVarNumeric( "DeviceErrorOnFailure", 1, dev, SSSID ) ~= 0 then
-		luup.set_failure( failState and 1 or 0, dev or pluginDevice )
-		for k,v in pairs( luup.devices ) do
-			if v.device_num_parent == dev then
-				luup.set_failure( failState and 1 or 0, k )
-			end
-		end
-	end
+	local devErr = getVarNumeric( "DeviceErrorOnFailure", 1, dev, SSSID ) ~= 0
+	luup.set_failure( ( devErr and failState ) and 1 or 0, dev or pluginDevice )
 end
 
 local function isArmed(dev)
@@ -782,7 +776,6 @@ end
 
 local function doEval( dev, ctx )
 	logRequest = (getVarNumeric("LogRequests", 0, dev) ~= 0) or debugMode
-	local numErrors = 0
 
 	-- Since we got a valid response, indicate not tripped, unless using TripExpression, then that.
 	-- Reset state var for (in)valid response?
@@ -852,6 +845,11 @@ local function doEval( dev, ctx )
 		return
 	end
 
+	-- Valid response. Let's parse it and set our variables.
+	local numErrors = 0
+	local failState = false -- innocent until proven guilty
+
+	-- Set up context for evaluation
 	ctx.__functions = ctx.__functions or {}
 	ctx.__lvars = ctx.__lvars or {}
 	ctx.__functions.finddevice = function( args )
@@ -871,7 +869,6 @@ local function doEval( dev, ctx )
 		return luup.variable_get( svc, var, vn ) or luaxp.NULL
 	end
 
-	-- Valid response. Let's parse it and set our variables.
 	local numexp = getVarNumeric( "NumExp", 8, dev, MYSID )
 	ctx.__lvars.expr = {}
 	for i = 1,numexp do
@@ -910,7 +907,7 @@ local function doEval( dev, ctx )
 		-- Save to device state if changed.
 		local oldVal = luup.variable_get(MYSID, "Value" .. tostring(i), dev)
 		D("doEval() newval=(%1)%2 canonical %3, oldVal=%4", type(r), r, rv, oldVal)
-		if rv ~= oldVal or debugMode then
+		if rv ~= oldVal then
 			-- Set new value only if changed
 			D("doEval() Expr%1 value changed, was %2 now %3", i, oldVal, rv)
 			setVar(MYSID, "Value" .. tostring(i), rv, dev)
@@ -918,31 +915,40 @@ local function doEval( dev, ctx )
 			-- Save to child if exists.
 			local dv = findChild( string.format( "ch%d", i ) )
 			if dv and luup.devices[dv] then
+				local failed = false
+				if r == nil and getVarNumeric( "FailChildOnExpressionError", 1, dv, MYSID ) ~= 0 then
+					failed = true
+				end
 				local df = dfMap[ luup.devices[dv].device_type ]
-				if df then
-					-- Note: re-using rv -- convert to sensor form value
+				if not df then
+					L({level=2,msg="Can't store value for expr %1 to child, no dfMap entry for %2"}, i, luup.devices[dv].device_type)
+					failed = true
+				elseif r ~= nil or getVarNumeric( "BlankChildOnExpressionError", 1, dv, MYSID ) ~= 0 then
+					-- Note: override rv to sensor-form value where needed
 					if df.datatype == "boolean" then
+						-- Note: boolean sensors are never blanked
 						if type(r) == "boolean" then rv = r and "1" or "0"
 						elseif type(r) == "number" then rv = (r~=0) and "1" or "0"
 						elseif type(r) == "string" then
 							rv = ( #r > 0 and r ~= "false" and r ~= "0" ) and "1" or "0"
 						else
-							rv = r ~= nil
+							rv = ( r == nil or luaxp.isNull( r ) ) and "0" or "1"
 						end
 						D("doEval() converting %1(%2) to sensor boolean value %3", r, type(r), rv)
-					elseif type(r) == "table" then
-						rv = table.concat( r, ", " )
-					else
-						rv = tostring(r)
 					end
-					D("doEval() converted %1(%2) to sensor %4 value %3", r, type(r), rv, df.datatype)
 					D("doEval() setting child %1 (#%2) %3/%4=%5", i, dv, df.service, df.variable, rv)
 					setVar( df.service or MYSID, df.variable or "CurrentLevel", rv, dv )
 				else
-					L({level=2,msg="Can't store value for expr %1 to child, no dfMap entry for %2"}, i, luup.devices[dv].device_type)
+					D("doEval() blank-on-error suppressed, no value change on %1 (#%2)", dv,
+						luup.devices[dv].description)
 				end
+				luup.set_failure( failed and 1 or 0, dv )
 			end
 		end
+	end
+	if getVarNumeric( "FailMasterOnExpressionError", 1, dev, MYSID ) ~= 0 and numErrors > 0 then
+		failState = true
+		D("doEval() FailMasterOnExpressionError with %1, state=%2", numErrors, failState)
 	end
 
 	-- Handle the trip expression
@@ -952,7 +958,7 @@ local function doEval( dev, ctx )
 		if texp == "" then texp = nil end
 		D("doEval() parsing TripExpression %1", texp)
 		local r = parseRefExpr(texp or "null", ctx, dev)
-		if r == nil then numErrors = numErrors + 1 end
+		if r == nil then failState = true numErrors = numErrors + 1 end
 		D("doEval() TripExpression result is %1", r)
 		if luaxp.isNull(r) then
 			C(dev, "Eval trip expression: %1=null", texp)
@@ -977,9 +983,9 @@ local function doEval( dev, ctx )
 	end
 
 	local msg
+	fail( failState, dev )
 	if numErrors > 0 then
 		msg = string.format("Query OK, but %d expressions failed", numErrors)
-		fail( true, dev )
 	else
 		local msgExpr = luup.variable_get(MYSID, "MessageExpr", dev) or ""
 		if msgExpr == "" then
@@ -988,7 +994,6 @@ local function doEval( dev, ctx )
 			msg = parseRefExpr(msgExpr, ctx, dev)
 			if msg == nil then msg = "?" end
 		end
-		fail( false, dev )
 	end
 	setMessage( msg, dev )
 end
@@ -1068,29 +1073,32 @@ local function runOnce(dev)
 	end
 
 	initVar(MYSID, "Enabled", 1, dev)
-	initVar(MYSID, "NumExp", 8, dev)
 	initVar(MYSID, "DebugMode", 0, dev)
-	initVar(MYSID, "Message", "", dev)
+	initVar( MYSID, "DeviceErrorOnFailure", 1, dev )
+	initVar( MYSID, "FailMasterOnExpressionError", 1, dev )
+	initVar( MYSID, "FailChildOnExpressionError", 1, dev )
+	initVar( MYSID, "BlankChildOnExpressionError", 0, dev )
+	initVar( MYSID, "MaxResponseSize", "", dev )
+	initVar(MYSID, "SSLProtocol", "", dev)
+	initVar(MYSID, "SSLVerify", "", dev)
+	initVar(MYSID, "SSLOptions", "", dev)
+	initVar(MYSID, "CAFile", "", dev)
+	initVar(MYSID, "UseCurl", "0", dev)
+	initVar(MYSID, "CurlOptions", "", dev)
+	initVar(MYSID, "NumExp", 8, dev)
 	initVar(MYSID, "RequestURL", "", dev)
 	initVar(MYSID, "Interval", "1800", dev)
 	initVar(MYSID, "Timeout", "30", dev)
 	initVar(MYSID, "QueryArmed", "1", dev)
 	initVar(MYSID, "ResponseType", "text", dev)
 	initVar(MYSID, "Trigger", "err", dev)
-	initVar(MYSID, "Failed", "1", dev)
 	initVar(MYSID, "LastQuery", "0", dev)
 	initVar(MYSID, "LastRun", "0", dev)
 	initVar(MYSID, "LogRequests", "0", dev)
 	initVar(MYSID, "EvalInterval", "", dev)
 	initVar(MYSID, "MessageExpr", "", dev)
-	initVar(MYSID, "SSLVerify", "", dev)
-	initVar(MYSID, "SSLProtocol", "", dev)
-	initVar(MYSID, "SSLOptions", "", dev)
-	initVar(MYSID, "UseCurl", "0", dev)
-	initVar(MYSID, "CurlOptions", "", dev)
-	initVar(MYSID, "CAFile", "", dev)
-	initVar( MYSID, "DeviceErrorOnFailure", 1, dev )
-	initVar( MYSID, "MaxResponseSize", "", dev )
+	initVar(MYSID, "Message", "", dev)
+	initVar(MYSID, "Failed", "1", dev)
 
 	initVar(SSSID, "Armed", "0", dev)
 	initVar(SSSID, "Tripped", "0", dev)
