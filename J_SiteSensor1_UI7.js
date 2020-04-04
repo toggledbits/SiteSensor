@@ -59,7 +59,7 @@ var SiteSensor = (function(api, $) {
 			api.performActionOnDevice( 0, "urn:micasaverde-com:serviceId:HomeAutomationGateway1", "Reload",
 				{ actionArguments: { Reason: "SiteSensor device changes require reload" } } );
 		}
-		needReload = false;
+		needsReload = false;
 	}
 
 	function initPlugin() {
