@@ -498,6 +498,9 @@ local function doRequest(url, method, body, dev)
 	if getVarNumeric( "UseCurl", 0, dev, MYSID ) ~= 0 then
 		-- Use curl
 		local req = string.format( "curl -m %d -o '%s'", timeout, fn )
+		if getVarNumeric( "FollowRedirects", 0, dev, MYSID ) ~= 0 then
+			req = req .. " -L"
+		end
 		for k,v in pairs( tHeaders or {} ) do
 			req = req .. " -H '" .. k .. ": " .. v .. "'"
 		end
@@ -527,7 +530,7 @@ local function doRequest(url, method, body, dev)
 				sink = ltn12.sink.file( f ),
 				method = method,
 				headers = tHeaders,
-				redirect = false
+				redirect = getVarNumeric( "FollowRedirects", 0, dev, MYSID ) ~= 0
 			}
 
 			-- HTTP or HTTPS?
@@ -553,7 +556,7 @@ local function doRequest(url, method, body, dev)
 			respBody, httpStatus, rh, st = requestor.request( req )
 			D("doRequest() request returned httpStatus=%1, respBody=%2, respHeaders=%3, status=%4", httpStatus, respBody, rh, st)
 
-			pcall( io.close, f ) -- make sure we're closed
+			if not string.match("|nil|closed|", io.type( f ) ) then pcall( io.close, f ) end -- make sure we're closed
 
 			-- Handle special errors from socket library
 			httpStatus = tonumber( httpStatus ) or 500
@@ -1079,6 +1082,7 @@ local function runOnce(dev)
 	initVar( MYSID, "FailChildOnExpressionError", 1, dev )
 	initVar( MYSID, "BlankChildOnExpressionError", 0, dev )
 	initVar( MYSID, "MaxResponseSize", "", dev )
+	initVar( MYSID, "FollowRedirects", 0, dev )
 	initVar(MYSID, "SSLProtocol", "", dev)
 	initVar(MYSID, "SSLVerify", "", dev)
 	initVar(MYSID, "SSLOptions", "", dev)
