@@ -15,9 +15,9 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.15develop-20094"
+local _PLUGIN_VERSION = "1.15develop-20095"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
-local _CONFIGVERSION = 20082
+local _CONFIGVERSION = 20095
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local MYTYPE = "urn:schemas-toggledbits-com:device:SiteSensor:1"
@@ -1347,19 +1347,18 @@ function init(dev)
 					local df = dfMap[ v.device_type ]
 					if df then
 						luup.chdev.append( dev, ptr, v.id, v.description, v.device_type,
-							luup.attr_get( 'device_file', devnum ) or "", "", "", false )
+							v.device_file, "", "", false )
+						--[[
 						local s = getVarNumeric( "Version", 0, devnum, MYSID )
 						if s == 0 then
-							-- First-time init for child
+							-- First-time init for child --??? still needed???
 							L("Performing first-time inits for %1", childid)
 							luup.attr_set( "category_num", df.category, devnum )
 							luup.attr_set( "subcategory_num", df.subcategory or 0, devnum )
 							luup.attr_set( "room", luup.devices[dev].room_num or 0, devnum )
 							luup.variable_set( MYSID, "Version", _CONFIGVERSION, devnum )
 						end
-						-- Copy current value to child for display
-						local cv = luup.variable_get( MYSID, "Value"..tostring(ix), dev ) or ""
-						setVar( df.service, df.variable, cv, devnum )
+						--]]
 					else
 						L({level=1,msg="Missing dfMap entry for %1; child for expr %2 will be removed."}, v.device_type, ix)
 						changed = true
@@ -1378,7 +1377,9 @@ function init(dev)
 					local vv = { ",room=" .. ( luup.devices[dev].room_num or 0 ) }
 					if df.category then table.insert( vv, ",category_num=" .. df.category ) end
 					if df.subcategory then table.insert( vv, ",subcategory_num=" .. df.subcategory ) end
-					luup.chdev.append( dev, ptr, childid, desc, "", df.device_file, "", "", false )
+					local cv = luup.variable_get( MYSID, "Value"..tostring(ix), dev ) or ""
+					table.insert( vv, string.format( "%s,%s=%s", df.service or "", df.variable or "CurrentValue", cv ) )
+					luup.chdev.append( dev, ptr, childid, desc, "", df.device_file, "", table.concat(vv, "\n"), false )
 					L("Creating new child device for expr %1; this will cause a Luup reload.", ix)
 					changed = true
 				else

@@ -13,7 +13,7 @@
 
 var SiteSensor = (function(api, $) {
 
-	var pluginVersion = "1.15develop-20094";
+	var pluginVersion = "1.15develop-20095";
 
 	// unique identifier for this plugin...
 	var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
@@ -30,7 +30,8 @@ var SiteSensor = (function(api, $) {
 	/* Recipe variables. Exprn are handled separately. */
 	var recipeVars = [ "RequestURL", "Headers", "Interval", "Timeout", "QueryArmed",
 					   "ResponseType", "Trigger", "NumExp", "TripExpression", "ArmedInterval",
-					   "EvalInternal" ];
+					   "EvalInternal", "FailMasterOnExpressionError", "FailChildOnExpressionError",
+					   "BlankChildOnExpressionError", "MaxResponseSize", "MessageExpr" ];
 
 	function updateResponseFields() {
 		var rtype = jQuery('select#rtype').val();
