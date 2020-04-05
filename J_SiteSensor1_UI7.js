@@ -13,7 +13,7 @@
 
 var SiteSensor = (function(api, $) {
 
-	var pluginVersion = "1.15develop-20095";
+	var pluginVersion = "1.15develop-20096";
 
 	// unique identifier for this plugin...
 	var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
@@ -159,7 +159,8 @@ var SiteSensor = (function(api, $) {
 			html += "<ol>";
 			for (var ix=1; ix<=numexp; ix += 1) {
 				html += '<li><input class="jsonexpr" id="expr' + ix + '" size="64" type="text">';
-				html += ' Child sensor: <select class="childtype" id="child' + ix + '"><option value="">(none)</option></select>';
+				html += ' <label>Desc:&nbsp;<input class="exprdesc"id="desc' + ix + '" size="20" type="text">';
+				html += ' <label>Child sensor:&nbsp;<select class="childtype" id="child' + ix + '"><option value="">(none)</option></select></label>';
 				html += '</li>';
 			}
 			html += "</ol>";
@@ -307,6 +308,8 @@ var SiteSensor = (function(api, $) {
 					jQuery( this ).val(s);
 					var typ = api.getDeviceState(myDevice, serviceId, "Child" + ix) || "";
 					jQuery( 'select#child' + ix + '.childtype' ).val( typ ).prop( 'disabled', "" === s );
+					var desc = api.getDeviceState(myDevice, serviceId, "Desc" + ix) || "";
+					jQuery( 'input#desc' + ix + '.exprdesc' ).val( desc ).prop( 'disabled', "" === s );
 				});
 				jQuery( 'input.jsonexpr' ).change( function( obj ) {
 					var newExpr = ( jQuery(this).val() || "" ).trim();
@@ -314,9 +317,17 @@ var SiteSensor = (function(api, $) {
 					api.setDeviceStatePersistent(myDevice, serviceId, "Expr" + ix, newExpr, 0);
 					if ( "" === newExpr ) {
 						jQuery( 'select#child' + ix + '.childtype' ).val( "" ).change().prop( 'disabled', true );
+						jQuery( 'input#desc' + ix + '.exprdesc' ).val( "" ).change().prop( 'disabled', true );
 					} else {
 						jQuery( 'select#child' + ix + '.childtype' ).prop( 'disabled', false );
+						jQuery( 'input#desc' + ix + '.exprdesc' ).prop( 'disabled', false );
 					}
+				});
+				jQuery( 'input.exprdesc' ).change( function( obj ) {
+					var $el = jQuery( this );
+					var ix = $el.attr('id').substr(4);
+					var newdesc = ( $el.val() || "" ).trim();
+					api.setDeviceStatePersistent(myDevice, serviceId, "Desc" + ix, newdesc );
 				});
 			}).fail( function( jqXHR ) {
 				jQuery( 'select.childtype' ).prop( 'disabled', true );
@@ -477,6 +488,12 @@ var SiteSensor = (function(api, $) {
 				if ( !val.match( /^\s*$/ ) ) {
 					data.config[exname] = val;
 				}
+
+				exname = "Desc" + ix;
+				val = api.getDeviceState( myid, serviceId, exname ) || "";
+				if ( !val.match( /^\s*$/ ) ) {
+					data.config[exname] = val;
+				}
 			}
 		}
 		var recipe = JSON.stringify( data, null, 4 );
@@ -564,6 +581,8 @@ var SiteSensor = (function(api, $) {
 				vname = "Expr" + ix;
 				api.setDeviceStateVariablePersistent( devnum, serviceId, vname, data.config[vname] || "" );
 				vname = "Child" + ix;
+				api.setDeviceStateVariablePersistent( devnum, serviceId, vname, data.config[vname] || "" );
+				vname = "Desc" + ix;
 				api.setDeviceStateVariablePersistent( devnum, serviceId, vname, data.config[vname] || "" );
 			}
 

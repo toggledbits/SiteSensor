@@ -15,7 +15,7 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.15develop-20095"
+local _PLUGIN_VERSION = "1.15develop-20096"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 20095
 
@@ -1376,8 +1376,13 @@ function init(dev)
 				-- Missing child. Append.
 				local df = dfMap[ childtype ]
 				if df then
-					local desc = " " .. tostring(ix)
-					desc = luup.attr_get( "name", dev ):sub(1, 20-#desc) .. desc
+					local desc = luup.variable_get( MYSID, "Desc"..tostring(ix), dev ) or ""
+					desc = desc:gsub( "^%s+", "" ):gsub( "%s+$", ""):gsub( "%s%s+", " " )
+						:gsub( "[^A-Za-z0-9_ -]", "" )
+					if "" == desc then
+						desc = " " .. tostring(ix)
+						desc = luup.attr_get( "name", dev ):sub(1, 20-#desc) .. desc
+					end
 					local vv = { ",room=" .. ( luup.devices[dev].room_num or 0 ) }
 					if df.category then table.insert( vv, ",category_num=" .. df.category ) end
 					if df.subcategory then table.insert( vv, ",subcategory_num=" .. df.subcategory ) end
