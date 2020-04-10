@@ -1,6 +1,6 @@
 # CHANGELOG #
 
-## Version 1.15 (development)
+## Version 1.15 (released)
 
 * Enhancement: Recipes! You can now save your SiteSensor configuration as a portable recipe, and load recipes you've saved or gotten from others.
 * Enhancement: JSON expressions can now be labeled. If a child virtual sensor is created for the expression, the then-current description/label is used as the initial name of the child device. Changes to the description/label after the child virtual sensor has been created *do not* change the device name.
