@@ -13,7 +13,7 @@
 
 var SiteSensor = (function(api, $) {
 
-	var pluginVersion = "1.15";
+	var pluginVersion = "1.16develop-20101";
 
 	// unique identifier for this plugin...
 	var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
@@ -659,15 +659,14 @@ textarea#blockdata { width: 100%; font-family: monospace; height: 6em; outline: 
 	<div id="loadcontrol"><button id="applyrecipe" class="btn btn-sm btn-warning">Apply This Recipe</button></div> \
 	<hr/>\
 	<h2>Create a Recipe</h2> \
-	<p>Have you made a SiteSensor configuration from which others may benefit? You can share this SiteSensor\'s configuration with others by creating a recipe. \
-	   <b>Edit the configuration below to remove any authorization keys or other sensitive data. Do not remove any key/value pairs, but you can leave the value blank (no data between quotes) if you must.</b> \
-	This editing does not change this SiteSensor"s configuration. As you edit, the block data representation \
-	below will be updated. When you are satisfied with your edits, you can select and copy the \
-	block data representation--<em>that</em> is the recipe you publish. Try not to break the JSON formatting of this configuration data. If you do, an error message will be shown below to help guide you to a fix; sometimes pasting the broken configuration into <a href="http://www.jsonlint.com/" target="_blank">jsonlint.com</a> will also help.</p><p>Hint: This is also a really good way to back up a SiteSensor configurations &mdash; you don\'t have to publish your recipes.</p></p><br/> \
-	<textarea id="origdata" wrap="off"></textarea> \
-	<p>Below is the block data representation -- this is what you publish.</p> \
-	<textarea id="blockdata"></textarea></div> \
-</div><hr/><div class="sise-footer">Thanks for using SiteSensor!</div>' );
+	<p>Hint: This is also a really good way to back up a SiteSensor configuration. Save the portable block to a text file on your PC, NAS, DropBox, etc.</p>\
+	<p><b>Step One.</b> The JSON text below is a snapshot of your SiteSensor configuration as it is now. Edit out any private data, like API keys or locations (hint: put in fake data that clearly needs to be replaced, like "API-KEY-HERE"). Editing this text <em>does not</em> alter your actual SiteSensor configuration. You are just working on a copy. Correct any errors that are shown as you edit. Do not remove any data or change any "key" names.</p> \
+	<p><b>Step Two.</b> Once you are satisfied with your editing, scroll down to where the portable presentation (encoded block) is shown (when there are no errors in the recipe). The portable presentation is what you publish. Do not publish the JSON text--it is too fragile to survive emailing and forum posting. The portable encoded block has a much better chance of survival.</p> \
+	<div><textarea id="origdata" wrap="off"></textarea></div> \
+	<p><b>PORTABLE PRESENTATION -- PUBLISH THE ENTIRE TEXT BLOCK BELOW!</b></p> \
+	<textarea id="blockdata"></textarea> \
+</div> \
+<hr/><div class="sise-footer">Thanks for using SiteSensor!</div>' );
 
 		$( 'button#applyrecipe' ).prop( 'disabled', true )
 			.on( "click", handleApply );
