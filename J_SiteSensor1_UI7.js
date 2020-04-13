@@ -30,7 +30,7 @@ var SiteSensor = (function(api, $) {
 	/* Recipe variables. Exprn are handled separately. */
 	var recipeVars = [ "RequestURL", "Headers", "Interval", "Timeout", "QueryArmed",
 					   "ResponseType", "Trigger", "NumExp", "TripExpression", "ArmedInterval",
-					   "EvalInternal", "FailMasterOnExpressionError", "FailChildOnExpressionError",
+					   "EvalInterval", "FailMasterOnExpressionError", "FailChildOnExpressionError",
 					   "BlankChildOnExpressionError", "MaxResponseSize", "MessageExpr" ];
 
 	function updateResponseFields() {
@@ -555,6 +555,9 @@ var SiteSensor = (function(api, $) {
 			var blk = atob( p1[1] );
 			var data = JSON.parse( blk );
 			var devnum = api.getCpanelDeviceId();
+			/* First, capture current number of expressions, so we can erase the excess if any. */
+			var oldnum = parseInt( api.getDeviceState( devnum, serviceId, "NumExp" ) ) || 8;
+			if ( isNaN( oldnum ) ) oldnum = 8;
 			/* Make a list of all variables we need */
 			var found = {};
 			for ( var ix=0; ix<recipeVars.length; ++ix ) { found[recipeVars[ix]] = true; }
@@ -577,19 +580,35 @@ var SiteSensor = (function(api, $) {
 			}
 			/* Get the expressions */
 			var numexp = parseInt( data.config.NumExp ) || 8;
-			for ( ix=1; ix<numexp; ++ix ) {
+			var n = oldnum > numexp ? oldnum : numexp;
+			for ( ix=1; ix<n; ++ix ) {
 				vname = "Expr" + ix;
-				api.setDeviceStateVariablePersistent( devnum, serviceId, vname, data.config[vname] || "" );
-				vname = "Child" + ix;
-				api.setDeviceStateVariablePersistent( devnum, serviceId, vname, data.config[vname] || "" );
-				vname = "Desc" + ix;
-				api.setDeviceStateVariablePersistent( devnum, serviceId, vname, data.config[vname] || "" );
+				var vv = data.config[vname] || "";
+				api.setDeviceStateVariablePersistent( devnum, serviceId, vname, vv );
+				if ( "" === vv ) {
+					api.setDeviceStateVariablePersistent( devnum, serviceId, "Desc"+ix, "" );
+					api.setDeviceStateVariablePersistent( devnum, serviceId, "Child"+ix, "" );
+				} else {
+					vname = "Desc" + ix;
+					api.setDeviceStateVariablePersistent( devnum, serviceId, vname, data.config[vname] || "" );
+					vname = "Child" + ix;
+					api.setDeviceStateVariablePersistent( devnum, serviceId, vname, data.config[vname] || "" );
+				}
+				/* Always clear old value */
+				api.setDeviceStateVariablePersistent( devnum, serviceId, "Value"+ix, "" );
 			}
 
 			/* Stamp the SiteSensor */
 			api.setDeviceStateVariablePersistent( devnum, serviceId, "LastRecipe",
 				String( data.name ) + ";" + String( data.author ) + ";" + String( data.version ) +
 				";" + String( Math.floor( Date.now() / 1000 ) ) );
+
+			/* Clear a few other things */
+			api.setDeviceStateVariablePersistent( devnum, serviceId, "LastQuery", "" );
+			api.setDeviceStateVariablePersistent( devnum, serviceId, "LastEval", "" );
+			api.setDeviceStateVariablePersistent( devnum, serviceId, "LastRun", "" );
+			api.setDeviceStateVariablePersistent( devnum, serviceId, "LogCapture",
+				"Loaded " + String( data.name ) + " version " + String( data.version ) );
 
 			/* Done! */
 			$( '.recipealert' ).text("Recipe applied!");
@@ -675,6 +694,8 @@ textarea#blockdata { width: 100%; font-family: monospace; height: 6em; outline: 
 			.on( "input", handleLoadChange );
 
 		$( '#origdata' )
+			.bind( "paste", function(e) { e.preventDefault(); } )
+			.bind( "cut copy", function(e) { e.preventDefault(); alert("This is not what you publish. Scroll down to find the Portable Presentation."); } )
 			.on( "input", handleRecipeChange )
 			.on( "change", handleRecipeChange );
 
