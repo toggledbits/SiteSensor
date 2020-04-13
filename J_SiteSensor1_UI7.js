@@ -13,7 +13,7 @@
 
 var SiteSensor = (function(api, $) {
 
-	var pluginVersion = "1.16develop-20101";
+	var pluginVersion = "1.16develop-20104";
 
 	// unique identifier for this plugin...
 	var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
@@ -419,9 +419,10 @@ var SiteSensor = (function(api, $) {
 		try {
 			var data = JSON.parse( recipe );
 			if ( String( data.name || "" ).match( /^\s*$/ ) ) { throw "Field 'name' is required for recipe name"; }
-			if ( String( data.version || "" ).match( /^\s*$/ ) ) { throw "Field 'version' is required"; }
 			if ( String( data.author || "" ).match( /^\s*$/ ) ) { throw "Field 'author' is required"; }
+			data.version = getVersion();
 			data.timestamp = Date.now();
+			recipe = JSON.stringify( data ); /* make machine-readable form */
 			var blk = btoa( recipe );
 			lines.push( "=== Ident: " + data.name + " version " + data.version + " by " +
 				data.author + "; " +
@@ -475,7 +476,6 @@ var SiteSensor = (function(api, $) {
 			}
 		}
 		data.source = api.getDeviceState( myid, serviceId, "Version" ) || 0;
-		data.version = getVersion();
 		var numexp = parseInt( data.config.NumExp ) || 8;
 		for ( ix=1; ix<=numexp; ix++ ) {
 			var exname = "Expr" + ix;
