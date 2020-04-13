@@ -15,9 +15,9 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.16develop-20101"
+local _PLUGIN_VERSION = "1.16develop-20104"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
-local _CONFIGVERSION = 20095
+local _CONFIGVERSION = 20104
 
 local MYSID = "urn:toggledbits-com:serviceId:SiteSensor1"
 local MYTYPE = "urn:schemas-toggledbits-com:device:SiteSensor:1"
