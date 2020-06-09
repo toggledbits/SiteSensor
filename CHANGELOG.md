@@ -2,7 +2,9 @@
 
 ## Version 1.16 (development)
 
+* Work around more Vera Luup brokenness; this time related to "My Modes", so that its attempts to arm the sensor (using an incorrect method) are successful.
 * Cleaned up language on Recipe tab to try to make it more clear what gets posted and what should not be.
+* Do a better job of initializing some variables when loading recipe; in particular, make sure old values are cleared out, and if the SS had more expressions than the recipe defines, make sure the excess expressions (and their associated states) are cleared.
 
 ## Version 1.15 (released)
 

@@ -15,7 +15,7 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.16develop-20104"
+local _PLUGIN_VERSION = "1.16develop-20161"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 20104
 
@@ -1196,7 +1196,9 @@ function arm(dev)
 	if not isArmed(dev) then
 		setVar(SSSID, "Armed", "1", dev)
 		-- Do not set ArmedTripped; Luup semantics
-		forceUpdate(dev)
+		-- Do not do update here; we have a watch on this variable, because Vera's
+		-- fu***... they made a bad decision on how to handle arming in "My Modes"
+		-- forceUpdate(dev)
 	end
 end
 
@@ -1275,6 +1277,15 @@ local function getDevice( dev, pdev, v ) -- luacheck: ignore 212
 	if d ~= nil and d[key] ~= nil and d[key].states ~= nil then d = d[key].states else d = nil end
 	devinfo.states = d or {}
 	return devinfo
+end
+
+function watchHandler( dev, sid, var, oldVal, newVal )
+	D("watchHandler(%1,%2,%3,%4,%5)", dev, sid, var, oldVal, newVal)
+	if luup.devices[dev].device_type == MYTYPE and
+			sid == SSSID and var == "Armed" and newVal ~= "0" then
+		L("Arming detected")
+		forceUpdate(dev)
+	end
 end
 
 function init(dev)
@@ -1407,6 +1418,14 @@ function init(dev)
 		L({level=2,msg="Child device devices; this will cause a Luup reload now."})
 	end
 	luup.chdev.sync( dev, ptr )
+
+	-- The most consistent thing at Vera is inconsistency. The rocket scientist that implemented
+	-- "My Modes" decided that, for devices in the SecuritySensor1 service, rather than invoking
+	-- the SetArmed action (as one normally must/should) to set the arming state, they would simply
+	-- write to the variable directly. Thus the action handler for SetArmed doesn't work when arming
+	-- state changes via My Modes. Brilliant, guys. Thanks for managing everyone's expectations.
+	-- Place a watch on the variable, and we'll react when it changes. Sheesh.
+	luup.variable_watch( 'siteSensorWatch', SSSID, "Armed", dev )
 
 	-- If sensor is query armed, and not armed, clear tripped explicitly.
 	runStamp = 1
