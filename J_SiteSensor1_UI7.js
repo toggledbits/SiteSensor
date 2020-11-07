@@ -607,6 +607,9 @@ var SiteSensor = (function(api, $) {
 			api.setDeviceStateVariablePersistent( devnum, serviceId, "LastQuery", "" );
 			api.setDeviceStateVariablePersistent( devnum, serviceId, "LastEval", "" );
 			api.setDeviceStateVariablePersistent( devnum, serviceId, "LastRun", "" );
+			api.setDeviceStateVariablePersistent( devnum, serviceId, "Failed", "0" );
+			api.setDeviceStateVariablePersistent( devnum, serviceId, "LastFail", "" );
+			api.setDeviceStateVariablePersistent( devnum, serviceId, "FailedSince", "" );
 			api.setDeviceStateVariablePersistent( devnum, serviceId, "LogCapture",
 				"Loaded " + String( data.name ) + " version " + String( data.version ) );
 
