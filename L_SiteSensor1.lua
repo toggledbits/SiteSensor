@@ -15,7 +15,7 @@ local debugMode = false
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.16develop-20162"
+local _PLUGIN_VERSION = "1.16develop-20312"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 20104
 
@@ -284,6 +284,10 @@ local function fail(failState, dev)
 	if failState ~= isFailed(dev) then
 		local fval = failState and 1 or 0
 		setVar(MYSID, "Failed", fval, dev or pluginDevice)
+		setVar(MYSID, "FailedSince", failState and os.time() or "", dev or pluginDevice)
+	end
+	if failState then
+		setVar(MYSID, "LastFail", os.time(), dev or pluginDevice)
 	end
 	local devErr = getVarNumeric( "DeviceErrorOnFailure", 1, dev, SSSID ) ~= 0
 	luup.set_failure( ( devErr and failState ) and 1 or 0, dev or pluginDevice )
@@ -551,6 +555,7 @@ local function doRequest(url, method, body, dev)
 
 			-- Make the request.
 			http.TIMEOUT = timeout -- N.B. http not https, regardless
+			requestor.TIMEOUT = timeout
 			C(dev, "%2 %1, headers=%3", url, method, tHeaders)
 			local rh, st
 			respBody, httpStatus, rh, st = requestor.request( req )
@@ -702,6 +707,7 @@ local function doMatchQuery( dev )
 	-- We don't use doRequest here because we can stop and close the
 	-- connection as soon as we find our pattern string.
 	http.TIMEOUT = timeout
+	requestor.TIMEOUT = timeout
 	C(dev, "HTTP %2 %1, headers=%3", url, method, tHeaders)
 
 	D("doMatchQuery() sending req=%1", req)
@@ -1103,6 +1109,8 @@ local function runOnce(dev)
 	initVar(MYSID, "MessageExpr", "", dev)
 	initVar(MYSID, "Message", "", dev)
 	initVar(MYSID, "Failed", "1", dev)
+	initVar(MYSID, "LastFail", "", dev)
+	initVar(MYSID, "FailedSince", "", dev)
 
 	initVar(SSSID, "Armed", "0", dev)
 	initVar(SSSID, "Tripped", "0", dev)
