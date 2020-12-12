@@ -12,10 +12,11 @@
 module("L_SiteSensor1", package.seeall)
 
 local debugMode = false
+local bypassVersionCheck = true
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.16develop-20312"
+local _PLUGIN_VERSION = "1.16develop-20346"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 20104
 
@@ -1062,6 +1063,7 @@ local function doJSONQuery(dev)
 end
 
 local function checkVersion(dev)
+	if bypassVersionCheck then return true end
 	assert(dev ~= nil)
 	D("checkVersion() branch %1 major %2 minor %3, string %4, openLuup %5", luup.version_branch, luup.version_major, luup.version_minor, luup.version, isOpenLuup)
 	if isOpenLuup or ( luup.version_branch == 1 and luup.version_major >= 7 ) then

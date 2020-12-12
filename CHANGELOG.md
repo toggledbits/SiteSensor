@@ -1,7 +1,8 @@
 # CHANGELOG #
 
-## Version 1.16 (development)
+## Version 1.16 (development 20346)
 
+* Fix load of recipe omitting last expression.
 * Work around more Vera Luup brokenness; this time related to "My Modes", so that its attempts to arm the sensor (using an incorrect method) are successful.
 * New state variables `LastFail` and `FailedSince` timestamp the most recent query failure and first in an unbroken series of failures, respectively.
 * Cleaned up language on Recipe tab to try to make it more clear what gets posted and what should not be.
