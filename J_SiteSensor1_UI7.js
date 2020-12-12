@@ -13,7 +13,7 @@
 
 var SiteSensor = (function(api, $) {
 
-	var pluginVersion = "1.16develop-20312";
+	var pluginVersion = "1.16develop-20346";
 
 	// unique identifier for this plugin...
 	var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
@@ -581,7 +581,7 @@ var SiteSensor = (function(api, $) {
 			/* Get the expressions */
 			var numexp = parseInt( data.config.NumExp ) || 8;
 			var n = oldnum > numexp ? oldnum : numexp;
-			for ( ix=1; ix<n; ++ix ) {
+			for ( ix=1; ix<=n; ++ix ) {
 				vname = "Expr" + ix;
 				var vv = data.config[vname] || "";
 				api.setDeviceStateVariablePersistent( devnum, serviceId, vname, vv );
