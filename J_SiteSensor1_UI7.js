@@ -3,17 +3,17 @@
  * J_SiteSensor_UI7.js
  * Configuration interface for SiteSensor
  *
- * Copyright 2016,2017,2019 Patrick H. Rigney, All Rights Reserved.
+ * Copyright 2016,2017,2019,2020 Patrick H. Rigney, All Rights Reserved.
  * This file is part of Reactor. For license information, see LICENSE at https://github.com/toggledbits/SiteSensor
  */
-/* globals api,Utils,jQuery,$ */
+/* globals window,api,Utils,jQuery,$ */
 /* jshint multistr: true */
 
 //"use strict"; // fails on UI7, works fine with ALTUI
 
 var SiteSensor = (function(api, $) {
 
-	var pluginVersion = "1.16develop-20346";
+	var pluginVersion = "1.16develop-20353";
 
 	// unique identifier for this plugin...
 	var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
@@ -22,9 +22,8 @@ var SiteSensor = (function(api, $) {
 
 	var myModule = {};
 
-	var isVisible = false;
 	var isOpenLuup = false;
-	// var isALTUI = false;
+	var isALTUI = undefined !== window.MultiBox;
 	var needsReload = false;
 
 	/* Recipe variables. Exprn are handled separately. */
@@ -32,6 +31,8 @@ var SiteSensor = (function(api, $) {
 					   "ResponseType", "Trigger", "NumExp", "TripExpression", "ArmedInterval",
 					   "EvalInterval", "FailMasterOnExpressionError", "FailChildOnExpressionError",
 					   "BlankChildOnExpressionError", "MaxResponseSize", "MessageExpr" ];
+
+	console.log("Loading J_SiteSensor1_UI7.js");
 
 	function updateResponseFields() {
 		var rtype = jQuery('select#rtype').val();
@@ -54,8 +55,7 @@ var SiteSensor = (function(api, $) {
 	}
 
 	function onBeforeCpanelClose(args) {
-		// console.log('handler for before cpanel close');
-		isVisible = false;
+		console.log('handler for before cpanel close');
 		if ( needsReload && confirm( "Since you changed device type configuration, Luup needs to be reloaded for those changes to take effect. Click 'OK' to reload now, or 'Cancel' to do it yourself later.") ) {
 			api.performActionOnDevice( 0, "urn:micasaverde-com:serviceId:HomeAutomationGateway1", "Reload",
 				{ actionArguments: { Reason: "SiteSensor device changes require reload" } } );
@@ -72,7 +72,7 @@ var SiteSensor = (function(api, $) {
 			}
 		}
 
-		needsReload = false;
+		// needsReload = false;
 	}
 
 	function configurePlugin()
@@ -90,35 +90,35 @@ var SiteSensor = (function(api, $) {
 
 			// Request URL
 			html += "<div class=\"tb-cgroup pull-left\">";
-			html += "<h2>Request URL</h2><label for=\"requestURL\">Enter the URL to be queried:</label><br/>";
-			html += "<textarea type=\"text\" rows=\"3\" cols=\"64\" wrap=\"soft\" id=\"requestURL\" />";
+			html += "<h2>Request URL</h2><label for=\"requestURL\">Enter the URL to be queried:</label><br>";
+			html += "<textarea type=\"text\" rows=\"3\" cols=\"64\" wrap=\"soft\" id=\"requestURL\"></textarea>";
 			html += "</div>";
 
 			// Request Headers
 			html += "<div class=\"tb-cgroup pull-left\">";
-			html += "<h2>Request Headers</h2><label for=\"requestHeaders\">Enter request headers, one per line:</label><br/>";
-			html += "<textarea type=\"text\" rows=\"3\" cols=\"64\" wrap=\"soft\" id=\"requestHeaders\" />";
+			html += "<h2>Request Headers</h2><label for=\"requestHeaders\">Enter request headers, one per line:</label><br>";
+			html += "<textarea type=\"text\" rows=\"3\" cols=\"64\" wrap=\"soft\" id=\"requestHeaders\"></textarea>";
 			html += "</div>";
 
 			html += "<div class=\"clearfix\"></div>";
 
 			// Request interval
 			html += "<div class=\"tb-cgroup pull-left\">";
-			html += "<h2>Request Interval</h2><label for=\"timeout\">Enter the number of seconds between requests:</label><br/>";
-			html += "<input type=\"text\" size=\"5\" maxlength=\"5\" class=\"numfield\" id=\"interval\" />";
+			html += "<h2>Request Interval</h2><label for=\"timeout\">Enter the number of seconds between requests:</label><br>";
+			html += "<input type=\"text\" size=\"5\" maxlength=\"5\" class=\"numfield\" id=\"interval\">";
 			html += " <input type=\"checkbox\" value=\"1\" id=\"queryarmed\">&nbsp;Query only when armed";
 			html += "</div>";
 
 			html += "<div class=\"tb-cgroup pull-left\">";
-			html += "<h2>Request Timeout</h2><label for=\"timeout\">Timeout (seconds):</label><br/>";
-			html += "<input type=\"text\" size=\"5\" maxlength=\"5\" class=\"numfield\" id=\"timeout\" />";
+			html += "<h2>Request Timeout</h2><label for=\"timeout\">Timeout (seconds):</label><br>";
+			html += "<input type=\"text\" size=\"5\" maxlength=\"5\" class=\"numfield\" id=\"timeout\">";
 			html += "</div>";
 
 			html += "<div class=\"clearfix\"></div>";
 
 			// Response Type
 			html += "<div class=\"tb-cgroup pull-left\">";
-			html += "<h2>Response Type</h2><label for=\"rtype\">Server response is handled as:</label><br/>";
+			html += "<h2>Response Type</h2><label for=\"rtype\">Server response is handled as:</label><br>";
 			html += '<select id="rtype"><option value="text">Generic (text)</option>';
 			html += '<option value="json">JSON data</option>';
 			html += '</select>';
@@ -126,7 +126,7 @@ var SiteSensor = (function(api, $) {
 
 			// Trigger
 			html += "<div class=\"tb-cgroup pull-left\">";
-			html += "<h2>Trigger Type</h2><label for=\"trigger\">Sensor is triggered when:</label><br/>";
+			html += "<h2>Trigger Type</h2><label for=\"trigger\">Sensor is triggered when:</label><br>";
 			html += '<select id="trigger"><option value="err">URL unreachable or server replies with error</option>';
 			html += '<option value="match">Response matches pattern</option>';
 			html += '<option value="neg">Response does not match pattern</option>';
@@ -138,14 +138,14 @@ var SiteSensor = (function(api, $) {
 
 			// Response pattern
 			html += '<div class="tb-textcontrols">';
-			html += "<h2>Response Pattern</h2><label for=\"pattern\">Enter the pattern to match in the response (note: not a regexp):</label><br/>";
-			html += "<input type=\"text\" size=\"64\" id=\"pattern\" />";
+			html += "<h2>Response Pattern</h2><label for=\"pattern\">Enter the pattern to match in the response (note: not a regexp):</label><br>";
+			html += "<input type=\"text\" size=\"64\" id=\"pattern\">";
 			html += "</div>";
 
 			// Trip Expression
 			html += '<div class="tb-jsoncontrols">';
-			html += "<h2>Trip Expression</h2><label for=\"tripexpression\">If the Trigger Type (above) is 'result of an expression', enter the expression below (true result=triggered):</label><br/>";
-			html += "<input type=\"text\" size=\"64\" id=\"tripexpression\" />";
+			html += "<h2>Trip Expression</h2><label for=\"tripexpression\">If the Trigger Type (above) is 'result of an expression', enter the expression below (true result=triggered):</label><br>";
+			html += "<input type=\"text\" size=\"64\" id=\"tripexpression\">";
 
 			// Expressions for drawing out field values
 			var numexp = parseInt( api.getDeviceState( myDevice, serviceId, "NumExp" ) || 8 );
@@ -154,7 +154,7 @@ var SiteSensor = (function(api, $) {
 			}
 			html += "<h2>Value Expressions</h2>";
 			html += "<p>Use these expressions to draw values from the response JSON data and store them in state variables. You can use these values as triggers for scenes and Lua scripts.";
-			html += " You can also push the expression values out to virtual sensors (created children of this SiteSensor) for use with scene triggers, Reactor, etc. <span id='openluupvirtual'/>";
+			html += " You can also push the expression values out to virtual sensors (created children of this SiteSensor) for use with scene triggers, Reactor, etc. <span id='openluupvirtual'></span>";
 			html += "</p>";
 			html += "<ol>";
 			for (var ix=1; ix<=numexp; ix += 1) {
@@ -172,7 +172,7 @@ var SiteSensor = (function(api, $) {
 			html += '<label for="reeval">Re-evaluate the expressions</label>&nbsp;<select id="reeval"><option value="">only immediately after requests (default)</option>';
 			html += '<option value="60">every minute</option>';
 			html += '</select>';
-			html += '<br/>If you have expressions comparing API responses to the current time and date, it is recommended that you re-evaluate them between requests and make your Request Interval longer. This avoids spamming the remote API with requests for data that rarely changes, but still gives you fast response to time-triggered events.';
+			html += '<br>If you have expressions comparing API responses to the current time and date, it is recommended that you re-evaluate them between requests and make your Request Interval longer. This avoids spamming the remote API with requests for data that rarely changes, but still gives you fast response to time-triggered events.';
 
 			html += "</div>"; // tb-jsoncontrols
 
@@ -285,10 +285,10 @@ var SiteSensor = (function(api, $) {
 				timeout: 5000
 			}).done( function( data, statusText, jqXHR ) {
 				var hasOne = false;
-				var childMenu = jQuery( '<select/>' );
+				var childMenu = jQuery( '<select></select>' );
 				for ( var ch in data ) {
 					if ( data.hasOwnProperty( ch ) ) {
-						childMenu.append( jQuery( '<option/>' ).val( ch ).text( data[ch].name || ch ) );
+						childMenu.append( jQuery( '<option></option>' ).val( ch ).text( data[ch].name || ch ) );
 						hasOne = hasOne || ch != "urn:schemas-upnp-org:device:BinaryLight:1";
 					}
 				}
@@ -328,6 +328,7 @@ var SiteSensor = (function(api, $) {
 					var ix = $el.attr('id').substr(4);
 					var newdesc = ( $el.val() || "" ).trim();
 					api.setDeviceStatePersistent(myDevice, serviceId, "Desc" + ix, newdesc );
+					needsReload = true;
 				});
 			}).fail( function( jqXHR ) {
 				jQuery( 'select.childtype' ).prop( 'disabled', true );
@@ -335,6 +336,16 @@ var SiteSensor = (function(api, $) {
 			});
 
 			updateResponseFields();
+
+			if ( isALTUI ) {
+				var paneId = $( '#requestURL' ).closest( '.tab-pane' ).attr('id');
+				$( 'a[href="#' + paneId + '"]' ).off( 'hide.bs.tab.sitesensor' )
+					.on( 'hide.bs.tab.sitesensor', function() {
+						onBeforeCpanelClose( api.getCpanelDeviceId() );
+					});
+			} else {
+				api.registerEventHandler('on_ui_cpanel_before_close', SiteSensor, 'onBeforeCpanelClose');
+			}
 		}
 		catch (e)
 		{
@@ -400,9 +411,15 @@ var SiteSensor = (function(api, $) {
 			// Push generated HTML to page
 			api.setCpanelContent(html);
 
-			isVisible = true;
-
-			api.registerEventHandler('on_ui_cpanel_before_close', SiteSensor, 'onBeforeCpanelClose');
+			if ( isALTUI ) {
+				var paneId = $( 'div#sitesensor-status' ).closest( '.tab-pane' ).attr('id');
+				$( 'a[href="#' + paneId + '"]' ).off( 'hide.bs.tab.sitesensor' )
+					.on( 'hide.bs.tab.sitesensor', function() {
+						onBeforeCpanelClose( api.getCpanelDeviceId() );
+					});
+			} else {
+				api.registerEventHandler('on_ui_cpanel_before_close', SiteSensor, 'onBeforeCpanelClose');
+			}
 
 			updateIndicators();
 		} catch (e) {
@@ -501,6 +518,22 @@ var SiteSensor = (function(api, $) {
 		handleRecipeChange();
 	}
 
+	/**
+	 * Inconsistencies between versions of UI7, and intra- and inter-ALTUI,
+	 * have to be resolved with some logic.
+	 */
+	function hideModal() {
+		if ( api.hideMessagePopup ) {
+			api.hideMessagePopup();
+		} else {
+			/* Sigh. Do both on ALTUI, in case amg0 fixes his dialogs some day. */
+			if ( isALTUI ) {
+				$( 'div#showMessagePopup' ).modal( 'hide' );
+			}
+			$( 'div#myModal' ).modal( 'hide' );
+		}
+	}
+
 	function waitForReloadComplete( msg ) {
 		return new Promise( function( resolve, reject ) {
 			var expire = Date.now() + 90000;
@@ -516,15 +549,15 @@ var SiteSensor = (function(api, $) {
 					timeout: 5000
 				}).done( function( data ) {
 					if ( data && data.status ) {
-						if (dlg) $("#myModal").modal("hide");
+						if (dlg) hideModal();
 						resolve( true );
 					} else {
-						if ( ! $("#myModal").is(":visible") ) {
+						if ( ! dlg ) {
 							api.showCustomPopup( msg || "Waiting for Luup ready before operation...", { autoHide: false, category: 3 } );
 							dlg = true;
 						}
 						if ( Date.now() >= expire ) {
-							if (dlg) $("#myModal").modal("hide");
+							if (dlg) hideModal();
 							reject( "timeout" );
 						} else {
 							setTimeout( tryAlive, 2000 );
@@ -532,10 +565,10 @@ var SiteSensor = (function(api, $) {
 					}
 				}).fail( function() {
 					if ( Date.now() >= expire ) {
-						if (dlg) $("#myModal").modal("hide");
+						if (dlg) hideModal;
 						reject( "timeout" );
 					} else {
-						if ( ! $("#myModal").is(":visible") ) {
+						if ( ! dlg ) {
 							api.showCustomPopup( msg || "Waiting for Luup ready before operation...", { autoHide: false, category: 3 } );
 							dlg = true;
 						}
@@ -625,9 +658,9 @@ var SiteSensor = (function(api, $) {
 				setTimeout( function() {
 					waitForReloadComplete("Waiting for Luup ready...").then( function() {
 						needsReload = false; /* we've done it */
-						$("#myModal").modal("hide");
+						hideModal;
 					}).catch( function(reason) {
-						$("#myModal").modal("hide");
+						hideModal;
 					});
 				}, 2000 );
 			} else {
@@ -677,9 +710,9 @@ textarea#blockdata { width: 100%; font-family: monospace; height: 6em; outline: 
 	<h2>Load a Recipe</h2> \
 	<p>Recipes are pre-packaged configurations that you can load quickly. To load a recipe, paste it into the box below. You\'ll be asked to confirm the recipe content before it is applied to this SiteSensor.</p> \
 	<textarea id="loadrecipe" placeholder="Paste the recipe here"></textarea> \
-	<div class="recipealert" />\
+	<div class="recipealert"></div>\
 	<div id="loadcontrol"><button id="applyrecipe" class="btn btn-sm btn-warning">Apply This Recipe</button></div> \
-	<hr/>\
+	<hr>\
 	<h2>Create a Recipe</h2> \
 	<p>Hint: This is also a really good way to back up a SiteSensor configuration. Save the portable block to a text file on your PC, NAS, DropBox, etc.</p>\
 	<p><b>Step One.</b> The JSON text below is a snapshot of your SiteSensor configuration as it is now. Edit out any private data, like API keys or locations (hint: put in fake data that clearly needs to be replaced, like "API-KEY-HERE"). Editing this text <em>does not</em> alter your actual SiteSensor configuration. You are just working on a copy. Correct any errors that are shown as you edit. Do not remove any data or change any "key" names.</p> \
@@ -688,7 +721,7 @@ textarea#blockdata { width: 100%; font-family: monospace; height: 6em; outline: 
 	<p><b>PORTABLE PRESENTATION -- PUBLISH THE ENTIRE TEXT BLOCK BELOW!</b></p> \
 	<textarea id="blockdata"></textarea> \
 </div> \
-<hr/><div class="sise-footer">Thanks for using SiteSensor!</div>' );
+<hr><div class="sise-footer">Thanks for using SiteSensor!</div>' );
 
 		$( 'button#applyrecipe' ).prop( 'disabled', true )
 			.on( "click", handleApply );
