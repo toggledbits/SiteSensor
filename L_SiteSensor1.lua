@@ -1,6 +1,6 @@
 -- -----------------------------------------------------------------------------
 -- L_SiteSensor.lua
--- Copyright 2016,2017,2019 Patrick H. Rigney, All Rights Reserved
+-- Copyright 2016,2017,2019,2020 Patrick H. Rigney, All Rights Reserved
 -- This file is available under GPL 3.0. See LICENSE in documentation for info.
 --
 -- TO-DO:
@@ -16,7 +16,7 @@ local bypassVersionCheck = true
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.16develop-20346"
+local _PLUGIN_VERSION = "1.16develop-20353"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 20104
 
@@ -360,9 +360,9 @@ function scheduleNext(dev, delay, stamp)
 		delay = 0 -- immediately!
 	else
 		local n = nextQuery - now
-		if n < delay then 
+		if n < delay then
 			D("scheduleNext() scheduling for %1 delay %2 (reduced from %3)", nextQuery, n, delay)
-			delay = n 
+			delay = n
 		end
 	end
 
@@ -914,46 +914,43 @@ local function doEval( dev, ctx )
 			rv = tostring(r)
 		end
 
-		-- Save to device state if changed.
-		local oldVal = luup.variable_get(MYSID, "Value" .. tostring(i), dev)
-		D("doEval() newval=(%1)%2 canonical %3, oldVal=%4", type(r), r, rv, oldVal)
-		if rv ~= oldVal then
-			-- Set new value only if changed
-			D("doEval() Expr%1 value changed, was %2 now %3", i, oldVal, rv)
-			setVar(MYSID, "Value" .. tostring(i), rv, dev)
+		-- Save to child state, if child.
+		D("doEval() Expr%4 newval=(%1)%2 canonical %3", type(r), r, rv, i)
+		setVar(MYSID, "Value" .. tostring(i), rv, dev)
 
-			-- Save to child if exists.
-			local dv = findChild( string.format( "ch%d", i ) )
-			if dv and luup.devices[dv] then
-				local failed = false
-				if r == nil and getVarNumeric( "FailChildOnExpressionError", 1, dv, MYSID ) ~= 0 then
-					failed = true
-				end
-				local df = dfMap[ luup.devices[dv].device_type ]
-				if not df then
-					L({level=2,msg="Can't store value for expr %1 to child, no dfMap entry for %2"}, i, luup.devices[dv].device_type)
-					failed = true
-				elseif r ~= nil or getVarNumeric( "BlankChildOnExpressionError", 1, dv, MYSID ) ~= 0 then
-					-- Note: override rv to sensor-form value where needed
-					if df.datatype == "boolean" then
-						-- Note: boolean sensors are never blanked
-						if type(r) == "boolean" then rv = r and "1" or "0"
-						elseif type(r) == "number" then rv = (r~=0) and "1" or "0"
-						elseif type(r) == "string" then
-							rv = ( #r > 0 and r ~= "false" and r ~= "0" ) and "1" or "0"
-						else
-							rv = ( r == nil or luaxp.isNull( r ) ) and "0" or "1"
-						end
-						D("doEval() converting %1(%2) to sensor boolean value %3", r, type(r), rv)
-					end
-					D("doEval() setting child %1 (#%2) %3/%4=%5", i, dv, df.service, df.variable, rv)
-					setVar( df.service or MYSID, df.variable or "CurrentLevel", rv, dv )
-				else
-					D("doEval() blank-on-error suppressed, no value change on %1 (#%2)", dv,
-						luup.devices[dv].description)
-				end
-				luup.set_failure( failed and 1 or 0, dv )
+		-- Save to child if exists.
+		local dv = findChild( string.format( "ch%d", i ) )
+		if dv and luup.devices[dv] then
+			local failed = false
+			if r == nil and getVarNumeric( "FailChildOnExpressionError", 1, dv, MYSID ) ~= 0 then
+				failed = true
 			end
+			local df = dfMap[ luup.devices[dv].device_type ]
+			if not df then
+				L({level=2,msg="Can't store value for expr %1 to child, no dfMap entry for %2"}, i, luup.devices[dv].device_type)
+				failed = true
+			elseif r ~= nil or getVarNumeric( "BlankChildOnExpressionError", 1, dv, MYSID ) ~= 0 then
+				-- Note: override rv to sensor-form value where needed
+				if df.datatype == "boolean" then
+					-- Note: boolean sensors are never blanked
+					if r == nil then -- error
+						rv = "0"
+					elseif type(r) == "boolean" then
+						rv = r and "1" or "0"
+					elseif type(r) == "number" then
+						rv = (r~=0) and "1" or "0"
+					elseif type(r) == "string" then
+						rv = ( #r > 0 and r ~= "false" and r ~= "0" ) and "1" or "0"
+					end
+					D("doEval() converting %1(%2) to sensor boolean value %3", r, type(r), rv)
+				end
+				D("doEval() setting child %1 (#%2) %3/%4=%5", i, dv, df.service, df.variable, rv)
+				setVar( df.service or MYSID, df.variable or "CurrentLevel", rv, dv )
+			else
+				D("doEval() blank-on-error suppressed, no value change on %1 (#%2)", dv,
+					luup.devices[dv].description)
+			end
+			luup.set_failure( failed and 1 or 0, dv )
 		end
 	end
 	if getVarNumeric( "FailMasterOnExpressionError", 1, dev, MYSID ) ~= 0 and numErrors > 0 then
@@ -1364,6 +1361,12 @@ function init(dev)
 			-- We should have a child.
 			local devnum = myChildren[ childid ]
 			D("init() child id %1 found devnum %2 luup.device=%3", childid, devnum, luup.devices[devnum])
+			local desc = luup.variable_get( MYSID, "Desc"..tostring(ix), dev ) or ""
+			desc = desc:gsub( "^%s+", "" ):gsub( "%s+$", ""):gsub( "%s%s+", " " ):gsub( "[^A-Za-z0-9_ -]", "" )
+			if "" == desc then
+				desc = " " .. tostring(ix)
+				desc = luup.attr_get( "name", dev ):sub(1, 20-#desc) .. desc
+			end
 			if devnum then
 				local v = luup.devices[ devnum ]
 				-- We do. Right type?
@@ -1371,7 +1374,11 @@ function init(dev)
 					-- Yes. Append (existing)
 					local df = dfMap[ v.device_type ]
 					if df then
-						luup.chdev.append( dev, ptr, v.id, v.description, v.device_type,
+						if ( desc ~= v.description ) then
+							L("Renaming child %1 from %2 to %3", ix, v.description, desc)
+						end
+						luup.attr_set( "name", desc, devnum ) -- openLuup
+						luup.chdev.append( dev, ptr, v.id, desc, v.device_type,
 							v.device_file, "", "", false )
 						--[[
 						local s = getVarNumeric( "Version", 0, devnum, MYSID )
@@ -1397,13 +1404,6 @@ function init(dev)
 				-- Missing child. Append.
 				local df = dfMap[ childtype ]
 				if df then
-					local desc = luup.variable_get( MYSID, "Desc"..tostring(ix), dev ) or ""
-					desc = desc:gsub( "^%s+", "" ):gsub( "%s+$", ""):gsub( "%s%s+", " " )
-						:gsub( "[^A-Za-z0-9_ -]", "" )
-					if "" == desc then
-						desc = " " .. tostring(ix)
-						desc = luup.attr_get( "name", dev ):sub(1, 20-#desc) .. desc
-					end
 					local vv = { ",room=" .. ( luup.devices[dev].room_num or 0 ) }
 					if df.category then table.insert( vv, ",category_num=" .. df.category ) end
 					if df.subcategory then table.insert( vv, ",subcategory_num=" .. df.subcategory ) end
