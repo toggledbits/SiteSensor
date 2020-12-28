@@ -545,8 +545,8 @@ local function doRequest(url, method, body, dev)
 				req.verify = getVar( "SSLVerify", "none", dev, MYSID )
 				req.protocol = getVar( "SSLProtocol", ( ssl._VERSION or "0.5" ):find("^0%.[45]") and "tlsv1" or "any", dev, MYSID )
 				req.mode = getVar( "SSLMode", "client", dev, MYSID )
-				local s = split( getVar( "SSLOptions", nil, dev, MYSID ) or "" )
-				if #s > 0 then req.options = s end
+				local s = split( getVar( "SSLOptions", nil, dev, MYSID ) or "all" )
+				if s and #s > 0 then req.options = s end
 				req.cafile = getVar( "CAFile", nil, dev, MYSID )
 				C(dev, "Set up for HTTPS (%4) request, verify=%1, protocol=%2, options=%3",
 					req.verify, req.protocol, req.options, ssl._VERSION)
