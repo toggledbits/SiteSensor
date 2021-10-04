@@ -13,7 +13,7 @@
 
 var SiteSensor = (function(api, $) {
 
-	var pluginVersion = "1.16develop-20353";
+	var pluginVersion = "1.16develop-21277";
 
 	// unique identifier for this plugin...
 	var uuid = '32f7fe60-79f5-11e7-969f-74d4351650de';
@@ -106,7 +106,7 @@ var SiteSensor = (function(api, $) {
 			html += "<div class=\"tb-cgroup pull-left\">";
 			html += "<h2>Request Interval</h2><label for=\"timeout\">Enter the number of seconds between requests:</label><br>";
 			html += "<input type=\"text\" size=\"5\" maxlength=\"5\" class=\"numfield\" id=\"interval\">";
-			html += " <input type=\"checkbox\" value=\"1\" id=\"queryarmed\">&nbsp;Query only when armed";
+			html += " <input type=\"checkbox\" value=\"1\" id=\"queryarmed\"><label for=\"queryarmed\">&nbsp;Query only when armed</label>";
 			html += "</div>";
 
 			html += "<div class=\"tb-cgroup pull-left\">";
@@ -204,19 +204,26 @@ var SiteSensor = (function(api, $) {
 				api.setDeviceStatePersistent(myDevice, serviceId, "Headers", newText, 0);
 			});
 
-			s = parseInt(api.getDeviceState(myDevice, serviceId, "Interval"));
-			if (isNaN(s))
+			var interval = parseInt(api.getDeviceState(myDevice, serviceId, "Interval"));
+			if ( isNaN(interval) ) {
 				s = 1800;
-			jQuery("input#interval").val(s).change( function( obj ) {
+            }
+			jQuery("input#interval").val(interval).change( function( obj ) {
 				var newInterval = jQuery(this).val().trim();
-				if (newInterval.match(/^[0-9]+$/) && newInterval > 0)
-					api.setDeviceStatePersistent(myDevice, serviceId, "Interval", newInterval, 0);
+                if ( isNaN( newInterval ) || newInterval < 0 ) {
+                    newInterval = 0;
+                    jQuery(this).val(newInterval);
+                }
+                api.setDeviceStatePersistent(myDevice, serviceId, "Interval", newInterval, 0);
+                jQuery( 'input#queryarmed' ).prop( 'disabled', newInterval <= 0 );
 			});
 
 			s = parseInt(api.getDeviceState(myDevice, serviceId, "QueryArmed"));
 			if (isNaN(s))
 				s = 1;
-			if (s != 0) jQuery("input#queryarmed").prop("checked", true);
+            console.log( "stored queryarmed state", s );
+			jQuery("input#queryarmed").prop("checked", !!s )
+                .prop( "disabled", interval <= 0 );
 			jQuery("input#queryarmed").change( function( obj ) {
 				var newState = jQuery(this).prop("checked");
 				api.setDeviceStatePersistent(myDevice, serviceId, "QueryArmed", newState ? "1" : "0", 0);

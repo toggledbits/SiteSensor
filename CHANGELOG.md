@@ -1,7 +1,8 @@
 # CHANGELOG #
 
-## Version 1.16 (development 20353)
+## Version 1.16 (development 21277)
 
+* Setting 0 interval suppresses queries (whether armed or not). In this state, the only way to run queries is with the `DoRequest` action (service ID `urn:toggledbits-com:serviceId:SiteSensor1`).
 * Fix load of recipe omitting last expression.
 * Workaround absence of on_cpanel_close even in ALTUI; other ALTUI mods for 2.52.
 * Work around more Vera Luup brokenness; this time related to "My Modes", so that its attempts to arm the sensor (using an incorrect method) are successful.

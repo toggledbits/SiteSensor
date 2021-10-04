@@ -16,7 +16,7 @@ local bypassVersionCheck = true
 
 local _PLUGIN_ID = 8942 -- luacheck: ignore 211
 local _PLUGIN_NAME = "SiteSensor"
-local _PLUGIN_VERSION = "1.16develop-20353"
+local _PLUGIN_VERSION = "1.16develop-21277"
 local _PLUGIN_URL = "https://www.toggledbits.com/sitesensor"
 local _CONFIGVERSION = 20104
 
@@ -330,6 +330,10 @@ function scheduleNext(dev, delay, stamp)
 			delay = getVarNumeric( "ArmedInterval", delay, dev )
 		end
 		D("scheduleNext() interval is %1", delay)
+		if delay < 1 then
+			L("Interval zero; not scheduling next query.")
+			return
+		end
 		if delay < 30 then
 			L({level=2,msg="WARNING! Request interval of %1 may be shorter than connection timeout, and cause all kinds of problems."}, delay)
 		end
@@ -1125,11 +1129,27 @@ local function runOnce(dev)
 	end
 end
 
+function doQuery( dev )
+	local timeNow = os.time()
+	local qtype = luup.variable_get(MYSID, "ResponseType", dev) or "text"
+	dev = tonumber( dev ) or error("Invalid device number")
+
+	-- Mark time, always, even if the query fails.
+	luup.variable_set( MYSID, "LastQuery", timeNow, dev )
+	luup.variable_set( MYSID, "LastEval", timeNow, dev )
+
+	-- What type of query?
+	if qtype == "json" then
+		doJSONQuery(dev)
+	else
+		doMatchQuery(dev)
+	end
+end
+
 -- runQuery is the call_delay callback. It takes one argument (exactly), which we
 -- format as "stamp:devno"
 function runQuery(p)
 	D("runQuery(%1)", p)
-	-- D("runQuery() hackity hack... scheduler.current_device is %1", _G.package.loaded['openLuup.scheduler'].current_device())
 	local stepStamp,dev
 
 	stepStamp,dev = string.match(p, "(%d+):(%d+)")
@@ -1163,18 +1183,12 @@ function runQuery(p)
 	if isArmed then
 		interval = getVarNumeric( "ArmedInterval", interval, dev )
 	end
+	if interval < 1 then
+		return -- we're not doing or rescheduling
+	end
 	local qtype = luup.variable_get(MYSID, "ResponseType", dev) or "text"
 	if timeNow >= ( last + interval ) then
-		-- Mark time, always, even if the query fails.
-		luup.variable_set( MYSID, "LastQuery", timeNow, dev )
-		luup.variable_set( MYSID, "LastEval", timeNow, dev )
-
-		-- What type of query?
-		if qtype == "json" then
-			doJSONQuery(dev)
-		else
-			doMatchQuery(dev)
-		end
+		doQuery( dev )
 	elseif qtype == "json" then
 		-- Not time, but for JSON we may do an eval if re-eval ticks are enabled.
 		local evalTick = getVarNumeric( "EvalInterval", 0, dev )
@@ -1192,9 +1206,7 @@ end
 local function forceUpdate(dev)
 	D("forceUpdate(%1)", dev)
 	assert(dev ~= nil)
-	luup.variable_set( MYSID, "LastQuery", 0, dev )
-	runStamp = runStamp + 1
-	scheduleNext(dev, 1, runStamp)
+	doQuery(dev)
 end
 
 function arm(dev)
@@ -1239,7 +1251,10 @@ function actionSetEnabled( dev, newVal )
 	if enabled ~= isEnabled( dev ) then
 		-- Change
 		luup.variable_set( MYSID, "Enabled", enabled and "1" or "0", dev )
-		if enabled then forceUpdate( dev ) end
+		if enabled then
+			runStamp = runStamp + 1
+			scheduleNext( dev, 1, runStamp )
+		end
 	end
 	return true
 end
@@ -1289,9 +1304,16 @@ end
 function watchHandler( dev, sid, var, oldVal, newVal )
 	D("watchHandler(%1,%2,%3,%4,%5)", dev, sid, var, oldVal, newVal)
 	if luup.devices[dev].device_type == MYTYPE and
-			sid == SSSID and var == "Armed" and newVal ~= "0" then
-		L("Arming detected")
-		forceUpdate(dev)
+			sid == SSSID and var == "Armed" then
+		D("watchHandler() arming state change %1->%2", oldVal, newVal)
+		if newVal ~= 0 and getVarNumeric( "QueryArmed", 1, dev ) ~= 0 then
+			-- If query only when armed, arming forces a query
+			luup.variable_set( MYSID, "LastQuery", 0, dev ) -- force update
+			L("Armed; forcing update/query")
+		end
+		-- And reschedule (in case ArmedInterval is different)
+		runStamp = runStamp + 1
+		scheduleNext( dev, nil, runStamp )
 	end
 end
 
